@@ -2,117 +2,292 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>??? TelemetrÌa 4G</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { background: #0c0c0c; color: #fff; font-family: sans-serif; text-align: center; margin: 0; padding-bottom: 50px; }
-    h1 { color: #00ff99; margin: 15px 0; font-size: 1.2rem; }
-    
-    /* Grid de datos */
-    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 10px; max-width: 500px; margin: 0 auto; }
-    .card { background: #1a1a1a; border-radius: 10px; padding: 15px; border: 1px solid #333; }
-    .label { font-size: 12px; color: #aaa; letter-spacing: 1px; }
-    .value { font-size: 28px; font-weight: bold; color: #00ff99; margin: 5px 0; }
-    .unit { font-size: 12px; color: #666; }
-
-    /* Consola de depuraciÛn en pantalla (PARA EL M”VIL) */
-    #debug-box {
-      width: 90%; margin: 20px auto; background: #220000; color: #ffcccc; 
-      font-family: monospace; font-size: 10px; text-align: left; 
-      padding: 10px; border: 1px solid red; min-height: 100px;
-      white-space: pre-wrap; word-wrap: break-word;
-    }
-    .status-ok { color: #00ff99; }
-    .status-err { color: #ff5555; }
-  </style>
+  <title>Monitor Telemetr√≠a OBD-II</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;500;700&display=swap" rel="stylesheet">
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+
+  <style>
+    /* --- ESTILOS GENERALES --- */
+    :root {
+      --bg-color: #0f172a;       /* Azul muy oscuro */
+      --card-bg: #1e293b;        /* Azul gris√°ceo */
+      --text-main: #f8fafc;      /* Blanco roto */
+      --accent: #10b981;         /* Verde esmeralda (Simyo/Conectado) */
+      --accent-dim: rgba(16, 185, 129, 0.1);
+      --danger: #ef4444;         /* Rojo error */
+      --warning: #f59e0b;        /* Naranja espera */
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Roboto', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    /* --- ENCABEZADO --- */
+    header {
+      width: 100%;
+      max-width: 600px;
+      margin-bottom: 25px;
+      text-align: center;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #334155;
+    }
+
+    h1 {
+      font-weight: 700;
+      font-size: 1.5rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: #94a3b8;
+    }
+
+    /* --- ESTADO DE CONEXI√ìN --- */
+    #connection-pill {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 50px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      background: rgba(255,255,255,0.05);
+      color: #94a3b8;
+      margin-top: 10px;
+      transition: all 0.3s ease;
+    }
+    
+    .status-active { background: var(--accent-dim) !important; color: var(--accent) !important; border: 1px solid var(--accent); }
+    .status-error { background: rgba(239, 68, 68, 0.1) !important; color: var(--danger) !important; border: 1px solid var(--danger); }
+
+    /* --- GRID DE DATOS --- */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr); /* 2 columnas */
+      gap: 15px;
+      width: 100%;
+      max-width: 600px;
+    }
+
+    /* --- TARJETAS (CARDS) --- */
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      border: 1px solid #334155;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Efecto decorativo barra superior en cada tarjeta */
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 4px;
+      background: var(--accent);
+      opacity: 0.7;
+    }
+
+    .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #94a3b8;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+
+    .value-container {
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .value {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .unit {
+      font-size: 0.9rem;
+      color: #64748b;
+      font-weight: 400;
+    }
+
+    /* --- TARJETA GRANDE (VELOCIDAD) --- */
+    .card.highlight {
+      grid-column: span 2; /* Ocupa todo el ancho */
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      border-color: var(--accent);
+    }
+    .highlight .value { color: var(--accent); font-size: 3.5rem; }
+
+    /* --- PIE DE P√ÅGINA --- */
+    footer {
+      margin-top: 40px;
+      font-size: 0.7rem;
+      color: #475569;
+    }
+
+  </style>
 </head>
 <body>
 
-  <h1>?? TelemetrÌa 4G (EMQX)</h1>
-  <div id="status">Iniciando...</div>
+  <header>
+    <h1>Telemetr√≠a 4G</h1>
+    <div class="subtitle">Raspberry Pi + OBD-II + MQTT</div>
+    <div id="connection-pill">Esperando conexi√≥n...</div>
+  </header>
 
-  <div class="grid">
-    <div class="card"><div class="label">RPM</div><div class="value" id="rpm">--</div><div class="unit">rpm</div></div>
-    <div class="card"><div class="label">VELOCIDAD</div><div class="value" id="speed">--</div><div class="unit">km/h</div></div>
-    <div class="card"><div class="label">TEMP</div><div class="value" id="temp">--</div><div class="unit">∞C</div></div>
-    <div class="card"><div class="label">GAS</div><div class="value" id="throttle">--</div><div class="unit">%</div></div>
-    <div class="card"><div class="label">FUEL</div><div class="value" id="fuel">--</div><div class="unit">%</div></div>
-    <div class="card"><div class="label">VOLT</div><div class="value" id="voltage">--</div><div class="unit">V</div></div>
+  <div class="dashboard-grid">
+    
+    <div class="card highlight">
+      <div class="label">Velocidad</div>
+      <div class="value-container">
+        <span class="value" id="speed">--</span>
+        <span class="unit">km/h</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Motor</div>
+      <div class="value-container">
+        <span class="value" id="rpm">--</span>
+        <span class="unit">rpm</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Temp</div>
+      <div class="value-container">
+        <span class="value" id="temp">--</span>
+        <span class="unit">¬∞C</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Carga</div>
+      <div class="value-container">
+        <span class="value" id="load">--</span> <span class="unit">%</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Pedal</div>
+      <div class="value-container">
+        <span class="value" id="throttle">--</span>
+        <span class="unit">%</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Fuel</div>
+      <div class="value-container">
+        <span class="value" id="fuel">--</span>
+        <span class="unit">%</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Bater√≠a</div>
+      <div class="value-container">
+        <span class="value" id="voltage">--</span>
+        <span class="unit">V</span>
+      </div>
+    </div>
+
   </div>
 
-  <h3>Registro de ConexiÛn (Debug):</h3>
-  <div id="debug-box">Esperando log...</div>
+  <footer>
+    Proyecto IoT - Visualizaci√≥n Remota via 4G
+  </footer>
 
-<script>
-  // --- FUNCI”N PARA ESCRIBIR EN PANTALLA ---
-  function log(msg) {
-    const box = document.getElementById("debug-box");
-    const time = new Date().toLocaleTimeString();
-    box.innerHTML = `[${time}] ${msg}\n` + box.innerHTML;
-    console.log(msg);
-  }
+  <script>
+    // --- CONFIGURACI√ìN ---
+    const broker = "broker.emqx.io";
+    const port = 8084;
+    const topic = "coches/raspi1/telemetria";
+    const clientID = "web_" + Math.random().toString(16).substr(2, 8);
 
-  // --- CONFIGURACI”N EMQX (M¡S ROBUSTO) ---
-  const broker = "broker.emqx.io";
-  const port = 8084; // Puerto SSL de EMQX
-  const topic = "coches/raspi1/telemetria";
-  const clientID = "movil_" + Math.random().toString(16).substr(2, 8);
+    const statusPill = document.getElementById("connection-pill");
 
-  log(`Configurando cliente... Broker: ${broker}:${port}`);
-
-  const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
-
-  client.onConnectionLost = (resp) => {
-    log("?? ConexiÛn perdida: " + resp.errorMessage);
-    document.getElementById("status").innerText = "Reconectando...";
-    document.getElementById("status").className = "status-err";
-  };
-
-  client.onMessageArrived = (msg) => {
-    try {
-      const data = JSON.parse(msg.payloadString);
-      document.getElementById("rpm").innerText = data.rpm;
-      document.getElementById("speed").innerText = data.speed;
-      document.getElementById("temp").innerText = data.temp;
-      document.getElementById("throttle").innerText = data.throttle;
-      document.getElementById("fuel").innerText = data.fuel;
-      document.getElementById("voltage").innerText = data.voltage;
-      
-      // Feedback visual r·pido
-      document.getElementById("status").innerText = "?? Recibiendo datos...";
-    } catch (e) {
-      log("Error leyendo JSON: " + e.message);
+    // --- FUNCIONES UI ---
+    function setStatus(state, msg) {
+      statusPill.innerText = msg;
+      statusPill.className = ""; // Reset clases
+      if (state === "ok") statusPill.classList.add("status-active");
+      if (state === "error") statusPill.classList.add("status-error");
     }
-  };
 
-  // Opciones de conexiÛn
-  const options = {
-    useSSL: true, // OBLIGATORIO para mÛviles
-    timeout: 3,
-    onSuccess: () => {
-      log("? °CONECTADO! Suscribiendo al tema...");
-      document.getElementById("status").innerText = "Conectado";
-      document.getElementById("status").className = "status-ok";
-      client.subscribe(topic, {
-        onSuccess: () => log("? Suscrito a " + topic),
-        onFailure: (e) => log("? Fallo suscripciÛn: " + e.errorMessage)
-      });
-    },
-    onFailure: (e) => {
-      log("? FALLO CONEXI”N FINAL: " + e.errorMessage);
-      log("Posible causa: Firewall corporativo o puerto 8084 bloqueado.");
-      document.getElementById("status").innerText = "Error Fatal";
+    function updateVal(id, val) {
+      const el = document.getElementById(id);
+      if (el && val !== undefined) {
+        el.innerText = val;
+      }
     }
-  };
 
-  log("Intentando conectar con SSL (WSS)...");
-  try {
-    client.connect(options);
-  } catch (e) {
-    log("? ExcepciÛn al conectar: " + e.message);
-  }
+    // --- MQTT ---
+    const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
 
-</script>
+    client.onConnectionLost = (resp) => {
+      console.log("Perdido:", resp.errorMessage);
+      setStatus("error", "Desconectado");
+    };
+
+    client.onMessageArrived = (msg) => {
+      try {
+        const data = JSON.parse(msg.payloadString);
+        
+        // Efecto visual: Parpadeo sutil del indicador verde al recibir datos
+        statusPill.style.opacity = 0.5;
+        setTimeout(() => statusPill.style.opacity = 1, 100);
+
+        updateVal("rpm", data.rpm);
+        updateVal("speed", data.speed);
+        updateVal("temp", data.temp);
+        updateVal("throttle", data.throttle);
+        updateVal("fuel", data.fuel);
+        updateVal("load", data.load); // Aseg√∫rate de que tu Python env√≠a "load"
+        updateVal("voltage", data.voltage);
+
+      } catch (e) {
+        console.error("Error JSON:", e);
+      }
+    };
+
+    // --- CONEXI√ìN ---
+    console.log("Conectando...");
+    setStatus("wait", "Conectando a la nube...");
+
+    client.connect({
+      useSSL: true,
+      onSuccess: () => {
+        console.log("Conectado!");
+        setStatus("ok", "‚óè En L√≠nea - Recibiendo datos");
+        client.subscribe(topic);
+      },
+      onFailure: (e) => {
+        console.log("Fallo:", e.errorMessage);
+        setStatus("error", "Error de conexi√≥n");
+      }
+    });
+  </script>
 </body>
 </html>
