@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>??? Telemetría 4G</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { background: #0c0c0c; color: #fff; font-family: sans-serif; text-align: center; margin: 0; padding-bottom: 50px; }
+    h1 { color: #00ff99; margin: 15px 0; font-size: 1.2rem; }
+    
+    /* Grid de datos */
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 10px; max-width: 500px; margin: 0 auto; }
+    .card { background: #1a1a1a; border-radius: 10px; padding: 15px; border: 1px solid #333; }
+    .label { font-size: 12px; color: #aaa; letter-spacing: 1px; }
+    .value { font-size: 28px; font-weight: bold; color: #00ff99; margin: 5px 0; }
+    .unit { font-size: 12px; color: #666; }
+
+    /* Consola de depuración en pantalla (PARA EL MÓVIL) */
+    #debug-box {
+      width: 90%; margin: 20px auto; background: #220000; color: #ffcccc; 
+      font-family: monospace; font-size: 10px; text-align: left; 
+      padding: 10px; border: 1px solid red; min-height: 100px;
+      white-space: pre-wrap; word-wrap: break-word;
+    }
+    .status-ok { color: #00ff99; }
+    .status-err { color: #ff5555; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+</head>
+<body>
+
+  <h1>?? Telemetría 4G (EMQX)</h1>
+  <div id="status">Iniciando...</div>
+
+  <div class="grid">
+    <div class="card"><div class="label">RPM</div><div class="value" id="rpm">--</div><div class="unit">rpm</div></div>
+    <div class="card"><div class="label">VELOCIDAD</div><div class="value" id="speed">--</div><div class="unit">km/h</div></div>
+    <div class="card"><div class="label">TEMP</div><div class="value" id="temp">--</div><div class="unit">°C</div></div>
+    <div class="card"><div class="label">GAS</div><div class="value" id="throttle">--</div><div class="unit">%</div></div>
+    <div class="card"><div class="label">FUEL</div><div class="value" id="fuel">--</div><div class="unit">%</div></div>
+    <div class="card"><div class="label">VOLT</div><div class="value" id="voltage">--</div><div class="unit">V</div></div>
+  </div>
+
+  <h3>Registro de Conexión (Debug):</h3>
+  <div id="debug-box">Esperando log...</div>
+
+<script>
+  // --- FUNCIÓN PARA ESCRIBIR EN PANTALLA ---
+  function log(msg) {
+    const box = document.getElementById("debug-box");
+    const time = new Date().toLocaleTimeString();
+    box.innerHTML = `[${time}] ${msg}\n` + box.innerHTML;
+    console.log(msg);
+  }
+
+  // --- CONFIGURACIÓN EMQX (MÁS ROBUSTO) ---
+  const broker = "broker.emqx.io";
+  const port = 8084; // Puerto SSL de EMQX
+  const topic = "coches/raspi1/telemetria";
+  const clientID = "movil_" + Math.random().toString(16).substr(2, 8);
+
+  log(`Configurando cliente... Broker: ${broker}:${port}`);
+
+  const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
+
+  client.onConnectionLost = (resp) => {
+    log("?? Conexión perdida: " + resp.errorMessage);
+    document.getElementById("status").innerText = "Reconectando...";
+    document.getElementById("status").className = "status-err";
+  };
+
+  client.onMessageArrived = (msg) => {
+    try {
+      const data = JSON.parse(msg.payloadString);
+      document.getElementById("rpm").innerText = data.rpm;
+      document.getElementById("speed").innerText = data.speed;
+      document.getElementById("temp").innerText = data.temp;
+      document.getElementById("throttle").innerText = data.throttle;
+      document.getElementById("fuel").innerText = data.fuel;
+      document.getElementById("voltage").innerText = data.voltage;
+      
+      // Feedback visual rápido
+      document.getElementById("status").innerText = "?? Recibiendo datos...";
+    } catch (e) {
+      log("Error leyendo JSON: " + e.message);
+    }
+  };
+
+  // Opciones de conexión
+  const options = {
+    useSSL: true, // OBLIGATORIO para móviles
+    timeout: 3,
+    onSuccess: () => {
+      log("? ¡CONECTADO! Suscribiendo al tema...");
+      document.getElementById("status").innerText = "Conectado";
+      document.getElementById("status").className = "status-ok";
+      client.subscribe(topic, {
+        onSuccess: () => log("? Suscrito a " + topic),
+        onFailure: (e) => log("? Fallo suscripción: " + e.errorMessage)
+      });
+    },
+    onFailure: (e) => {
+      log("? FALLO CONEXIÓN FINAL: " + e.errorMessage);
+      log("Posible causa: Firewall corporativo o puerto 8084 bloqueado.");
+      document.getElementById("status").innerText = "Error Fatal";
+    }
+  };
+
+  log("Intentando conectar con SSL (WSS)...");
+  try {
+    client.connect(options);
+  } catch (e) {
+    log("? Excepción al conectar: " + e.message);
+  }
+
+</script>
+</body>
+</html>
