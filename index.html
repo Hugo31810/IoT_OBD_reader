@@ -157,6 +157,7 @@
     const clientID = "fleet_gps_final_" + Math.random().toString(16).substr(2, 8);
     const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
 
+    // Elementos DOM de las tarjetas (incluyendo la tarjeta GPS de la pestaña PRINCIPAL)
     const cards = { 
       speed: document.getElementById("speed"), rpm: document.getElementById("rpm"), temp: document.getElementById("temp"), oil: document.getElementById("oil"), 
       map: document.getElementById("map"), load: document.getElementById("load"), fuel: document.getElementById("fuel"), voltage: document.getElementById("voltage"), 
@@ -164,14 +165,14 @@
       // GPS Cards PRINCIPAL
       lat: document.getElementById("lat"), lon: document.getElementById("lon"), sats: document.getElementById("sats")
     };
-    // Elementos de la pestaña LOCALIZACIÓN
+    // Elementos de la pestaña LOCALIZACIÓN (usados para el mapa y texto grande)
     const mapCoords = { lat: document.getElementById("map-lat"), lon: document.getElementById("map-lon"), sats: document.getElementById("map-sats") }
     
     // Almacena el ultimo valor para persistencia en tarjetas
     const lastDisplayedValues = { 
         speed: 0, rpm: 0, temp: 0, oil: 0, map: 0, load: 0, fuel: 0, voltage: 0, 
         throttle: 0, iat: 0, lambda: 0, timing: 0,
-        lat: 0, lon: 0, sats: 0 // Valores GPS
+        lat: 0.0, lon: 0.0, sats: 0 
     };
 
 
@@ -186,7 +187,8 @@
 
     function initMap() {
       if (mymap !== null) mymap.remove();
-      mymap = L.map('mapid').setView([40.4168, -3.7038], 13); // Centro inicial Madrid
+      // Inicializar con la posición conocida de Madrid si no hay datos.
+      mymap = L.map('mapid').setView([40.4168, -3.7038], 13); 
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -198,10 +200,10 @@
     function updateMap(lat, lon, sats) {
       if (mymap === null) return;
       
-      // 1. Actualizar coordenadas en la PESTAÑA LOCALIZACIÓN
-      if (lat !== undefined) mapCoords.lat.innerText = lat.toFixed(6);
-      if (lon !== undefined) mapCoords.lon.innerText = lon.toFixed(6);
-      if (sats !== undefined) mapCoords.sats.innerText = sats;
+      // 1. Actualizar coordenadas en la PESTAÑA LOCALIZACIÓN (FIX)
+      mapCoords.lat.innerText = lat ? lat.toFixed(6) : "--.----";
+      mapCoords.lon.innerText = lon ? lon.toFixed(6) : "--.----";
+      mapCoords.sats.innerText = sats;
 
 
       if (lat === 0 || lon === 0 || sats === 0) {
@@ -215,6 +217,8 @@
         marker.setLatLng(newLatLng);
         marker.setPopupContent(`Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}<br>Satélites: ${sats}`).openPopup();
       }
+      
+      // Centrar el mapa solo si estamos en la pestaña o si el zoom es bajo
       if (!document.getElementById('location-view').classList.contains('hidden')) {
            mymap.setView(newLatLng, 16); 
       }
@@ -225,7 +229,7 @@
 
     function updateDataAndState(data) {
         let currentValues = {};
-        // Métricas que pueden ser 0 de forma válida
+        // Métricas que pueden ser 0 de forma válida (Vel/RPM/Volts/Fuel/GPS)
         const updateAlwaysMetrics = ['speed', 'rpm', 'voltage', 'fuel', 'lat', 'lon', 'sats']; 
 
         for (const [key, el] of Object.entries(cards)) { 
@@ -234,7 +238,7 @@
             if (value !== undefined) {
                 
                 if (updateAlwaysMetrics.includes(key)) {
-                    // Actualizar siempre.
+                    // Actualizar siempre. Aceptar 0 para Speed/RPM/Voltaje/Fuel/GPS
                     el.innerText = value;
                     lastDisplayedValues[key] = value;
                     currentValues[key] = value;
@@ -244,7 +248,7 @@
                     lastDisplayedValues[key] = value;
                     currentValues[key] = value;
                 } else {
-                    // Si el valor es 0 o indefinido, usar el valor persistente para el display y la gráfica
+                    // Si el valor es 0 (para Temp/Oil/MAP) o indefinido, usar el valor persistente
                     el.innerText = lastDisplayedValues[key] > 0 ? lastDisplayedValues[key] : "--";
                     currentValues[key] = lastDisplayedValues[key]; 
                 }
