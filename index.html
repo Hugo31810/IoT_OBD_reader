@@ -158,6 +158,8 @@
 
     function updateMap(lat, lon, sats) {
       if (mymap === null) return;
+      
+      // La persistencia de Lat/Lon/Sats se gestiona en updateCardsAndState
       if (lat === 0 || lon === 0 || sats === 0) {
         if (marker) marker.setLatLng([0, 0]).bindPopup("Esperando señal GPS...").openPopup();
         return;
@@ -182,29 +184,37 @@
 
     function updateCardsAndState(data) {
         let currentValues = {};
+        const nonZeroMetrics = ['temp', 'oil', 'map', 'load', 'iat', 'lambda', 'timing', 'lat', 'lon', 'sats'];
+        const updateAlwaysMetrics = ['speed', 'rpm', 'voltage', 'fuel']; // Estos pueden ser 0 de forma válida
 
         for (const [key, el] of Object.entries(cards)) { 
             const value = data[key];
 
             if (value !== undefined) {
-                // Reglas de Persistencia:
-                if (key === 'speed' || key === 'rpm' || key === 'voltage' || key === 'fuel' || key === 'sats' || key === 'lat' || key === 'lon') {
-                    // Estos pueden ser 0 (el coche está parado/apagado/sin señal). Actualizar siempre.
+                if (updateAlwaysMetrics.includes(key)) {
+                    // Velocidad/RPM/Voltaje/Fuel: Actualizar siempre, incluso si es 0
                     el.innerText = value;
                     lastDisplayedValues[key] = value;
                     currentValues[key] = value;
-                } else if (value > 0) {
-                    // Para Temp, Oil, MAP, Load (que no deberían ser 0 si el coche está encendido), si el valor es > 0, es válido.
-                    el.innerText = value;
-                    lastDisplayedValues[key] = value;
-                    currentValues[key] = value;
+                } else if (nonZeroMetrics.includes(key)) {
+                    // Temp/Oil/MAP/etc.: Solo actualizar si el valor es POSITIVO (> 0)
+                    if (value > 0) {
+                        el.innerText = value;
+                        lastDisplayedValues[key] = value;
+                        currentValues[key] = value;
+                    } else {
+                        // Si es 0 o indefinido, usar el valor persistente para el display y la gráfica
+                        el.innerText = lastDisplayedValues[key] > 0 ? lastDisplayedValues[key] : "--";
+                        currentValues[key] = lastDisplayedValues[key]; 
+                    }
                 } else {
-                    // Si el valor es 0 o indefinido (error de lectura), usamos el último valor conocido.
-                    el.innerText = lastDisplayedValues[key] > 0 ? lastDisplayedValues[key] : "--";
-                    currentValues[key] = lastDisplayedValues[key]; // Usar valor anterior en la gráfica
+                    // Métricas GPS: Actualizar siempre
+                    el.innerText = value;
+                    lastDisplayedValues[key] = value;
+                    currentValues[key] = value;
                 }
             } else {
-                 // Si el dato no viene, usar el último valor conocido
+                // Si el dato no viene en el payload (no debería pasar con el último Python), usar persistencia
                 currentValues[key] = lastDisplayedValues[key];
             }
         }
@@ -231,13 +241,11 @@
     function updateCharts(data) {
         const timeStr = new Date().getSeconds();
         
-        // Ahora usamos los valores persistentes (data) que ya no deberían contener 0 erróneos.
-        // Pero convertimos 0s sospechosos a NaN para que la línea no caiga si Python envía un 0.
-        
+        // RPM y Speed pueden ser 0, los aceptamos
         const speedVal = data.speed;
         const rpmVal = data.rpm;
         
-        // Si Temp/Oil son 0, probablemente es una inicialización o un fallo muy profundo, lo ignoramos en la gráfica.
+        // Las Temperaturas deben ser > 0 (si el motor está caliente), si son 0, usamos NaN para que la línea sea recta.
         const tempVal = data.temp > 0 ? data.temp : NaN; 
         const oilVal = data.oil > 0 ? data.oil : NaN;
 
@@ -289,7 +297,7 @@
     client.onMessageArrived = (msg) => { 
       try { 
         const data = JSON.parse(msg.payloadString);
-        updateCardsAndState(data); // LLamada a la nueva función de persistencia
+        updateCardsAndState(data); // LLamada a la función de persistencia
       } catch (e) { console.error(e); } 
     };
 
