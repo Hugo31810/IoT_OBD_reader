@@ -129,6 +129,13 @@
     };
     const mapCoords = { lat: document.getElementById("map-lat"), lon: document.getElementById("map-lon"), sats: document.getElementById("map-sats") }
 
+    // Almacena el último valor no-cero válido para cada métrica.
+    const lastDisplayedValues = { 
+        speed: 0, rpm: 0, temp: 0, oil: 0, map: 0, load: 0, fuel: 0, voltage: 0, 
+        lat: 0, lon: 0, sats: 0, throttle: 0, iat: 0, lambda: 0, timing: 0
+    };
+
+
     // --- GRÁFICOS (Mantenidos) ---
     const ctx1 = document.getElementById('perfChart').getContext('2d');
     const perfChart = new Chart(ctx1, { type: 'line', data: { labels: [], datasets: [ { label: 'Velocidad', data: [], borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y', pointRadius: 0, tension: 0.3 }, { label: 'RPM', data: [], borderColor: '#f59e0b', borderWidth: 2, yAxisID: 'y1', pointRadius: 0, tension: 0.3 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { type: 'linear', position: 'left', ticks: { color: '#3b82f6' }, grid: { color: '#334155' } }, y1: { type: 'linear', display: true, position: 'right', ticks: { color: '#f59e0b', callback: v => v/1000 + 'k' }, grid: { drawOnChartArea: false } } } } });
@@ -140,7 +147,6 @@
 
     function initMap() {
       if (mymap !== null) mymap.remove();
-      // Usar coordenadas de Madrid como centro inicial si no hay datos
       mymap = L.map('mapid').setView([40.4168, -3.7038], 13);
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -172,7 +178,43 @@
     }
 
 
-    // --- ESTADO VISUAL Y FUNCIONES DE ASISTENCIA ---
+    // --- LÓGICA DE PERSISTENCIA Y ACTUALIZACIÓN ---
+
+    function updateCardsAndState(data) {
+        let currentValues = {};
+
+        for (const [key, el] of Object.entries(cards)) { 
+            const value = data[key];
+
+            if (value !== undefined) {
+                // Reglas de Persistencia:
+                if (key === 'speed' || key === 'rpm' || key === 'voltage' || key === 'fuel' || key === 'sats' || key === 'lat' || key === 'lon') {
+                    // Estos pueden ser 0 (el coche está parado/apagado/sin señal). Actualizar siempre.
+                    el.innerText = value;
+                    lastDisplayedValues[key] = value;
+                    currentValues[key] = value;
+                } else if (value > 0) {
+                    // Para Temp, Oil, MAP, Load (que no deberían ser 0 si el coche está encendido), si el valor es > 0, es válido.
+                    el.innerText = value;
+                    lastDisplayedValues[key] = value;
+                    currentValues[key] = value;
+                } else {
+                    // Si el valor es 0 o indefinido (error de lectura), usamos el último valor conocido.
+                    el.innerText = lastDisplayedValues[key] > 0 ? lastDisplayedValues[key] : "--";
+                    currentValues[key] = lastDisplayedValues[key]; // Usar valor anterior en la gráfica
+                }
+            } else {
+                 // Si el dato no viene, usar el último valor conocido
+                currentValues[key] = lastDisplayedValues[key];
+            }
+        }
+        
+        // Ejecutar lógicas de color y gráfica con los valores persistentes.
+        updateStatus(currentValues);
+        updateCharts(currentValues); 
+        updateMap(currentValues.lat, currentValues.lon, currentValues.sats);
+    }
+
     function updateStatus(data) {
       setColor("card-temp", data.temp, 40, 100); setColor("card-oil", data.oil, 50, 120); setColor("card-voltage", data.voltage, 12.0, 14.8);
       const elFuel = document.getElementById("card-fuel"); const alertBox = document.getElementById("fuel-alert");
@@ -189,10 +231,14 @@
     function updateCharts(data) {
         const timeStr = new Date().getSeconds();
         
-        // IGNORAR 0s para Temperaturas (FIX visual: 0 en Temp es error, no valor real)
+        // Ahora usamos los valores persistentes (data) que ya no deberían contener 0 erróneos.
+        // Pero convertimos 0s sospechosos a NaN para que la línea no caiga si Python envía un 0.
+        
         const speedVal = data.speed;
         const rpmVal = data.rpm;
-        const tempVal = data.temp > 0 ? data.temp : NaN;
+        
+        // Si Temp/Oil son 0, probablemente es una inicialización o un fallo muy profundo, lo ignoramos en la gráfica.
+        const tempVal = data.temp > 0 ? data.temp : NaN; 
         const oilVal = data.oil > 0 ? data.oil : NaN;
 
         perfChart.data.labels.push(timeStr); 
@@ -243,23 +289,7 @@
     client.onMessageArrived = (msg) => { 
       try { 
         const data = JSON.parse(msg.payloadString);
-        
-        // FIX CLAVE: No actualizar la tarjeta si el valor es 0 (para valores que NO deberían ser 0)
-        // Esto evita que las tarjetas de Temp/Oil caigan si Python tiene un fallo puntual.
-        for (const [key, el] of Object.entries(cards)) { 
-             const value = data[key];
-
-             // Actualizar siempre (RPM/Speed/Voltage pueden ser 0)
-             if (value !== undefined && (value !== 0 || el.id === 'speed' || el.id === 'rpm' || el.id === 'voltage' || el.id === 'fuel' || el.id === 'sats')) {
-                el.innerText = value;
-             } else if (value > 0) { // Si es Temp/Oil y es > 0, actualizar.
-                el.innerText = value;
-             }
-        }
-
-        updateStatus(data); 
-        updateCharts(data); 
-        updateMap(data.lat, data.lon, data.sats);
+        updateCardsAndState(data); // LLamada a la nueva función de persistencia
       } catch (e) { console.error(e); } 
     };
 
