@@ -148,7 +148,8 @@
 <body>
 
   <div class="nav-tabs">
-    <button class="nav-btn active" onclick="filterCategory('all')">TODO</button>
+    <button class="nav-btn active" onclick="filterCategory('user')">USUARIO</button>
+    <button class="nav-btn" onclick="filterCategory('all')">TODO</button>
     <button class="nav-btn" onclick="filterCategory('motor')">MOTOR</button>
     <button class="nav-btn" onclick="filterCategory('aire')">AIRE/TURBO</button>
     <button class="nav-btn" onclick="filterCategory('elec')">ELEC/FUEL</button>
@@ -156,7 +157,7 @@
 
   <div class="dashboard-grid">
     
-    <div class="card highlight cat-all cat-motor cat-aire cat-elec" id="card-speed">
+    <div class="card highlight cat-all cat-motor cat-aire cat-elec cat-user" id="card-speed">
       <div class="label">Velocidad</div>
       <div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div>
     </div>
@@ -166,12 +167,12 @@
       <div><span class="value" id="rpm">--</span></div>
     </div>
 
-    <div class="card cat-all cat-motor" id="card-temp">
+    <div class="card cat-all cat-motor cat-user" id="card-temp">
       <div class="label">Agua</div>
       <div><span class="value" id="temp">--</span> <span class="unit">°C</span></div>
     </div>
 
-    <div class="card cat-all cat-motor" id="card-oil">
+    <div class="card cat-all cat-motor cat-user" id="card-oil">
       <div class="label">Aceite</div>
       <div><span class="value" id="oil">--</span> <span class="unit">°C</span></div>
     </div>
@@ -206,12 +207,12 @@
       <div><span class="value" id="timing">--</span> <span class="unit">°</span></div>
     </div>
 
-    <div class="card cat-all cat-elec" id="card-fuel">
+    <div class="card cat-all cat-elec cat-user" id="card-fuel">
       <div class="label">Fuel</div>
       <div><span class="value" id="fuel">--</span> <span class="unit">%</span></div>
     </div>
 
-    <div class="card cat-all cat-elec" id="card-voltage">
+    <div class="card cat-all cat-elec cat-user" id="card-voltage">
       <div class="label">Batería</div>
       <div><span class="value" id="voltage">--</span> <span class="unit">V</span></div>
     </div>
@@ -241,37 +242,73 @@
     };
 
     function updateColors(data) {
+      // AGUA
       setColor("card-temp", data.temp, 40, 95);
+      
+      // ACEITE
       setColor("card-oil", data.oil, 50, 120);
+      
+      // BATERÍA (NUEVO)
+      // < 11.5: Rojo, 11.5-12.0: Amarillo, 12.0-14.8: Verde, > 14.8: Rojo
+      setColor("card-voltage", data.voltage, 12.0, 14.8); 
+
+      // FUEL (Lógica especial inversa, rojo si es bajo)
       const elFuel = document.getElementById("card-fuel");
       elFuel.classList.remove('state-danger', 'state-success');
       if(data.fuel < 20) elFuel.classList.add('state-danger');
       else elFuel.classList.add('state-success');
     }
 
+    // Función genérica para rangos (minOk - maxOk es zona verde)
+    // Por debajo de minOk es warning (Amarillo)
+    // Por debajo de minOk - margen (o logica custom) podria ser rojo, 
+    // pero aqui simplificamos: Fuera de rango = Warning/Danger
     function setColor(cardId, val, minOk, maxOk) {
       const el = document.getElementById(cardId);
       el.classList.remove('state-warning', 'state-success', 'state-danger');
       if(val == 0 || val == undefined) return;
-      if(val < minOk) el.classList.add('state-warning');
-      else if (val > maxOk) el.classList.add('state-danger');
-      else el.classList.add('state-success');
+
+      // Lógica general:
+      // Verde: Entre min y max
+      // Amarillo: Un poco por debajo del min (frio/bateria baja)
+      // Rojo: Muy por encima (caliente) o muy por debajo (bateria muerta)
+      
+      if (val >= minOk && val <= maxOk) {
+        el.classList.add('state-success'); // Verde
+      } else if (val < minOk) {
+         // Si es voltaje muy bajo (<11.5) o temperatura muy baja (<40)
+         // Para voltaje < 11.5 debería ser ROJO, entre 11.5 y 12 AMARILLO.
+         // Para simplificar con esta funcion:
+         if (cardId === 'card-voltage' && val < 11.5) el.classList.add('state-danger');
+         else el.classList.add('state-warning'); 
+      } else {
+        el.classList.add('state-danger'); // Rojo (Por encima del maximo)
+      }
     }
 
     function filterCategory(cat) {
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
       event.target.classList.add('active');
       const allCards = document.querySelectorAll('.card');
+      
       allCards.forEach(card => {
+        // Primero ocultamos todas
+        card.classList.add('hidden');
+        
+        // Mostramos según la categoría
         if (cat === 'all') {
             if(card.classList.contains('cat-all')) card.classList.remove('hidden');
-            else card.classList.add('hidden');
         } else {
             if(card.classList.contains('cat-' + cat)) card.classList.remove('hidden');
-            else card.classList.add('hidden');
         }
       });
     }
+
+    // Al cargar, activamos la pestaña USUARIO por defecto
+    window.onload = function() {
+        // Simulamos click en el primer botón (USUARIO)
+        document.querySelector('.nav-btn').click();
+    };
 
     client.onMessageArrived = (msg) => {
       try {
