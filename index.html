@@ -31,13 +31,8 @@
     .nav-btn.active { background: var(--info); color: white; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); }
 
     /* CONTENEDORES PRINCIPALES */
-    .dashboard-grid, #graph-view, #location-view {
-      width: 100%;
-      max-width: 600px;
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
+    .dashboard-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 600px; margin-bottom: 20px; }
+    #graph-view, #location-view { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 15px; }
     .hidden { display: none !important; }
 
     /* TARJETAS */
@@ -63,19 +58,9 @@
     .chart-header { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 10px; text-align: left; }
 
     /* MAPA LEAFLET */
-    #mapid { height: 350px; width: 100%; border-radius: 8px; border: 1px solid #334155; background-color: #334155; /* Color de fondo mientras carga */ }
-    .location-info {
-      background: var(--card-bg);
-      border-radius: 12px;
-      padding: 15px;
-      margin-bottom: 15px;
-      text-align: center;
-      border: 1px solid #334155;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-    .location-info .label { margin-bottom: 0; }
-    .location-info .value { font-size: 1.5rem; color: var(--info); }
-    .location-info .gps-sats { margin-top: 5px; }
+    #mapid { height: 350px; width: 100%; border-radius: 8px; border: 1px solid #334155; background-color: #334155; }
+    .location-info { background: var(--card-bg); border-radius: 12px; padding: 15px; margin-bottom: 15px; text-align: center; border: 1px solid #334155; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .location-info .label { margin-bottom: 0; } .location-info .value { font-size: 1.5rem; color: var(--info); } .location-info .gps-sats { margin-top: 5px; }
   </style>
 </head>
 <body>
@@ -85,13 +70,16 @@
   <div class="nav-tabs">
     <button class="nav-btn active" onclick="filterCategory('user')">PRINCIPAL</button>
     <button class="nav-btn" onclick="filterCategory('graph')">HISTÓRICO</button>
-    <button class="nav-btn" onclick="filterCategory('location')">LOCALIZACIÓN</button> <button class="nav-btn" onclick="filterCategory('all')">TÉCNICO</button>
+    <button class="nav-btn" onclick="filterCategory('location')">LOCALIZACIÓN</button> 
+    <button class="nav-btn" onclick="filterCategory('all')">TÉCNICO</button>
+    <button class="nav-btn" onclick="filterCategory('elec')">SISTEMAS</button>
   </div>
 
+  
   <div id="cards-view" class="dashboard-grid">
-    <div class="card highlight cat-all cat-user" id="card-speed"><div class="label">Velocidad</div><div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div></div>
+    <div class="card highlight cat-all cat-motor cat-elec cat-user cat-sistemas" id="card-speed"><div class="label">Velocidad</div><div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div></div>
     
-    <div class="card cat-all cat-user" style="border-color: var(--info);">
+    <div class="card cat-all cat-user cat-sistemas" style="border-color: var(--info);">
       <div class="label">Posición GPS</div>
       <div class="gps-coords">
         <div>Lat: <span id="lat">--.----</span></div>
@@ -102,19 +90,25 @@
 
     <div class="card cat-all cat-user" id="card-temp"><div class="label">Temp. Agua</div><div><span class="value" id="temp">--</span> <span class="unit">°C</span></div></div>
     <div class="card cat-all cat-user" id="card-oil"><div class="label">Temp. Aceite</div><div><span class="value" id="oil">--</span> <span class="unit">°C</span></div></div>
-    <div class="card cat-all cat-user" id="card-fuel"><div class="label">Combustible</div><div><span class="value" id="fuel">--</span> <span class="unit">%</span></div></div>
-    <div class="card cat-all cat-user" id="card-voltage"><div class="label">Batería</div><div><span class="value" id="voltage">--</span> <span class="unit">V</span></div></div>
+    <div class="card cat-all cat-user cat-sistemas" id="card-fuel"><div class="label">Combustible</div><div><span class="value" id="fuel">--</span> <span class="unit">%</span></div></div>
+    <div class="card cat-all cat-user cat-sistemas" id="card-voltage"><div class="label">Batería</div><div><span class="value" id="voltage">--</span> <span class="unit">V</span></div></div>
 
-    <div class="card cat-all" id="card-rpm"><div class="label">RPM</div><div><span class="value" id="rpm">--</span></div></div>
-    <div class="card cat-all" id="card-map"><div class="label">Presión MAP</div><div><span class="value" id="map">--</span> <span class="unit">kPa</span></div></div>
-    <div class="card cat-all" id="card-load"><div class="label">Carga Motor</div><div><span class="value" id="load">--</span> <span class="unit">%</span></div></div>
+    <div class="card cat-all cat-tecnico" id="card-rpm"><div class="label">RPM</div><div><span class="value" id="rpm">--</span></div></div>
+    <div class="card cat-all cat-tecnico" id="card-map"><div class="label">Presión MAP</div><div><span class="value" id="map">--</span> <span class="unit">kPa</span></div></div>
+    <div class="card cat-all cat-tecnico" id="card-load"><div class="label">Carga Motor</div><div><span class="value" id="load">--</span> <span class="unit">%</span></div></div>
+    <div class="card cat-all cat-tecnico" id="card-throttle"><div class="label">Acelerador</div><div><span class="value" id="throttle">--</span> <span class="unit">%</span></div></div>
+    <div class="card cat-all cat-tecnico" id="card-iat"><div class="label">Temp. Admisión</div><div><span class="value" id="iat">--</span> <span class="unit">°C</span></div></div>
+    <div class="card cat-all cat-tecnico" id="card-lambda"><div class="label">Mezcla (λ)</div><div><span class="value" id="lambda">--</span> <span class="unit"></span></div></div>
+    <div class="card cat-all cat-tecnico" id="card-timing"><div class="label">Avance</div><div><span class="value" id="timing">--</span> <span class="unit">°</span></div></div>
   </div>
 
+  
   <div id="graph-view" class="hidden">
     <div class="chart-container"><div class="chart-header">Velocidad / RPM (Último minuto)</div><canvas id="perfChart"></canvas></div>
     <div class="chart-container"><div class="chart-header">Temperatura Motor (Agua / Aceite)</div><canvas id="tempChart"></canvas></div>
   </div>
 
+  
   <div id="location-view" class="hidden">
     <div class="location-info">
       <div class="label">Coordenadas Actuales</div>
@@ -133,49 +127,40 @@
     const clientID = "fleet_gps_map_" + Math.random().toString(16).substr(2, 8);
     const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
 
-    // Elementos DOM para tarjetas (incluyendo GPS)
-    const cards = { 
-      speed: document.getElementById("speed"), rpm: document.getElementById("rpm"), 
-      temp: document.getElementById("temp"), oil: document.getElementById("oil"), 
-      map: document.getElementById("map"), load: document.getElementById("load"), 
-      fuel: document.getElementById("fuel"), voltage: document.getElementById("voltage"), 
-      lat: document.getElementById("lat"), lon: document.getElementById("lon"), sats: document.getElementById("sats") 
-    };
+    const cards = { speed: document.getElementById("speed"), rpm: document.getElementById("rpm"), temp: document.getElementById("temp"), oil: document.getElementById("oil"), map: document.getElementById("map"), load: document.getElementById("load"), fuel: document.getElementById("fuel"), voltage: document.getElementById("voltage"), 
+                    lat: document.getElementById("lat"), lon: document.getElementById("lon"), sats: document.getElementById("sats"),
+                    throttle: document.getElementById("throttle"), iat: document.getElementById("iat"), lambda: document.getElementById("lambda"), timing: document.getElementById("timing")};
 
-    // Elementos DOM para la vista de Localización
-    const mapCoords = {
-      lat: document.getElementById("map-lat"),
-      lon: document.getElementById("map-lon"),
-      sats: document.getElementById("map-sats")
-    }
+    const mapCoords = { lat: document.getElementById("map-lat"), lon: document.getElementById("map-lon"), sats: document.getElementById("map-sats") }
 
-    // --- GRÁFICOS ---
+    let mymap = null; let marker = null;
+    let initialMapLoad = true; // Variable de control
+
+    // --- GRÁFICOS (Mantenidos) ---
     const ctx1 = document.getElementById('perfChart').getContext('2d');
     const perfChart = new Chart(ctx1, { type: 'line', data: { labels: [], datasets: [ { label: 'Velocidad', data: [], borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y', pointRadius: 0, tension: 0.3 }, { label: 'RPM', data: [], borderColor: '#f59e0b', borderWidth: 2, yAxisID: 'y1', pointRadius: 0, tension: 0.3 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { type: 'linear', position: 'left', ticks: { color: '#3b82f6' }, grid: { color: '#334155' } }, y1: { type: 'linear', display: true, position: 'right', ticks: { color: '#f59e0b', callback: v => v/1000 + 'k' }, grid: { drawOnChartArea: false } } } } });
     const ctx2 = document.getElementById('tempChart').getContext('2d');
     const tempChart = new Chart(ctx2, { type: 'line', data: { labels: [], datasets: [ { label: 'Agua', data: [], borderColor: '#22d3ee', borderWidth: 2, pointRadius: 0, tension: 0.4 }, { label: 'Aceite', data: [], borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, tension: 0.4 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' }, suggestedMin: 50, suggestedMax: 110 } } } });
 
-    // --- MAPA LEAFLET ---
-    let mymap = null;
-    let marker = null;
 
+    // --- MAPA LEAFLET ---
     function initMap() {
-      if (mymap !== null) mymap.remove(); // Limpiar mapa si ya existe
-      mymap = L.map('mapid').setView([0, 0], 2); // Inicia en el centro del mundo con zoom 2
+      if (mymap !== null) mymap.remove();
+      // Usar coordenadas de Madrid como centro inicial si no hay datos
+      mymap = L.map('mapid').setView([40.4168, -3.7038], 13);
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(mymap);
 
-      marker = L.marker([0, 0]).addTo(mymap); // Marcador inicial
-      console.log("Mapa Leaflet inicializado.");
+      marker = L.marker([0, 0]).addTo(mymap);
+      initialMapLoad = false;
     }
 
     function updateMap(lat, lon, sats) {
-      // Si no hay datos GPS o está a 0, no actualizar el mapa
+      if (mymap === null) return;
       if (lat === 0 || lon === 0 || sats === 0) {
         if (marker) marker.setLatLng([0, 0]).bindPopup("Esperando señal GPS...").openPopup();
-        if (mymap) mymap.setView([0, 0], 2); // Volver al inicio
         return;
       }
       
@@ -183,12 +168,19 @@
       if (marker) {
         marker.setLatLng(newLatLng);
         marker.setPopupContent(`Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}<br>Satélites: ${sats}`).openPopup();
-      } else {
-        marker = L.marker(newLatLng).addTo(mymap);
-        marker.setPopupContent(`Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}<br>Satélites: ${sats}`).openPopup();
       }
-      if (mymap) mymap.setView(newLatLng, 16); // Centrar el mapa en la nueva posición con zoom 16
+      // Solo centrar el mapa la primera vez que se obtienen coordenadas válidas
+      // o si el zoom está muy alejado.
+      if (mymap.getZoom() < 10) {
+           mymap.setView(newLatLng, 16); 
+      }
+      
+      // Actualizar los datos de la tarjeta de info de localización
+      mapCoords.lat.innerText = lat.toFixed(6);
+      mapCoords.lon.innerText = lon.toFixed(6);
+      mapCoords.sats.innerText = sats;
     }
+
 
     // --- ESTADO VISUAL ---
     function updateStatus(data) {
@@ -202,8 +194,6 @@
       if (val >= minOk && val <= maxOk) el.classList.add('state-success');
       else if (val < minOk) { if (cardId === 'card-voltage' && val < 11.5) el.classList.add('state-danger'); else el.classList.add('state-warning'); } else el.classList.add('state-danger');
     }
-
-    // --- ACTUALIZACIÓN GRÁFICOS ---
     function updateCharts(data) {
         const timeStr = new Date().getSeconds();
         perfChart.data.labels.push(timeStr); perfChart.data.datasets[0].data.push(data.speed); perfChart.data.datasets[1].data.push(data.rpm);
@@ -216,60 +206,48 @@
     function filterCategory(cat) {
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); event.target.classList.add('active');
 
-      const cardsView = document.getElementById('cards-view');
-      const graphView = document.getElementById('graph-view');
-      const locationView = document.getElementById('location-view'); // Nueva vista
+      const views = { cards: document.getElementById('cards-view'), graph: document.getElementById('graph-view'), location: document.getElementById('location-view') };
 
-      // Ocultar todas las vistas
-      cardsView.classList.add('hidden');
-      graphView.classList.add('hidden');
-      locationView.classList.add('hidden');
+      for (let key in views) views[key].classList.add('hidden'); // Ocultar todas
 
-      // Mostrar la vista seleccionada
       if (cat === 'graph') {
-        graphView.classList.remove('hidden');
-        perfChart.resize(); // Asegura que los gráficos se redibujen bien al mostrarse
-        tempChart.resize();
+        views.graph.classList.remove('hidden');
+        perfChart.resize(); tempChart.resize();
       } else if (cat === 'location') {
-        locationView.classList.remove('hidden');
-        if (mymap === null) initMap(); // Inicializar el mapa solo cuando se muestra la vista
-        mymap.invalidateSize(); // Refrescar el tamaño del mapa para que se muestre correctamente
-      } else { // Cat 'user' o 'all' (vista de tarjetas)
-        cardsView.classList.remove('hidden');
+        views.location.classList.remove('hidden');
+        if (mymap === null) initMap();
+        setTimeout(() => { if (mymap) mymap.invalidateSize(); }, 50); // FIX CLAVE: Invalidar tamaño después de mostrar
+      } else { 
+        views.cards.classList.remove('hidden');
+        
+        // Mostrar solo las tarjetas de la categoría seleccionada
         document.querySelectorAll('.card').forEach(card => { 
           card.classList.add('hidden'); 
+          // Corrección: Usamos las clases específicas para cada categoría
           if (cat === 'all') { if(card.classList.contains('cat-all')) card.classList.remove('hidden'); } 
-          else { if(card.classList.contains('cat-' + cat)) card.classList.remove('hidden'); } 
+          else if (cat === 'user') { if(card.classList.contains('cat-user')) card.classList.remove('hidden'); }
+          else if (cat === 'tecnico') { if(card.classList.contains('cat-tecnico')) card.classList.remove('hidden'); }
+          else if (cat === 'sistemas') { if(card.classList.contains('cat-sistemas')) card.classList.remove('hidden'); }
         });
       }
     }
 
-    window.onload = function() { 
-      filterCategory('user', document.querySelector('.nav-btn.active')); // Cargar pestaña PRINCIPAL al inicio
-    };
+    window.onload = function() { filterCategory('user', document.querySelector('.nav-btn.active')); };
 
     // --- RECEPCIÓN MQTT ---
     client.onMessageArrived = (msg) => { 
       try { 
         const data = JSON.parse(msg.payloadString);
-        
-        // Actualizar textos de tarjetas principales
         for (const [key, el] of Object.entries(cards)) { 
           if(data[key] !== undefined) el.innerText = data[key]; 
         }
-
-        // Actualizar datos de la vista de localización
-        mapCoords.lat.innerText = data.lat ? data.lat.toFixed(6) : "--.----";
-        mapCoords.lon.innerText = data.lon ? data.lon.toFixed(6) : "--.----";
-        mapCoords.sats.innerText = data.sats || 0;
-        
         updateStatus(data); 
         updateCharts(data); 
-        updateMap(data.lat, data.lon, data.sats); // Actualizar mapa
+        updateMap(data.lat, data.lon, data.sats);
       } catch (e) { console.error(e); } 
     };
 
-    client.connect({ useSSL: true, onSuccess: () => { console.log("Conectado a MQTT"); client.subscribe(topic); }});
+    client.connect({ useSSL: true, onSuccess: () => { console.log("Conectado"); client.subscribe(topic); }});
   </script>
 </body>
 </html>
