@@ -4,8 +4,10 @@
   <meta charset="UTF-8">
   <title>Rally Telemetry Pro</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;500;700;900&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     :root {
@@ -89,73 +91,49 @@
 
     .hidden { display: none; }
 
-    .card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 4px;
-      background: #64748b;
-      opacity: 0.7;
-    }
+    .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: #64748b; opacity: 0.7; }
+    .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 5px; }
+    .value { font-size: 2rem; font-weight: 700; color: var(--text-main); }
+    .unit { font-size: 0.8rem; color: #64748b; }
 
-    .label {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #94a3b8;
-      margin-bottom: 5px;
-    }
-
-    .value {
-      font-size: 2rem;
-      font-weight: 700;
-      color: var(--text-main);
-    }
-
-    .unit {
-      font-size: 0.8rem;
-      color: #64748b;
-    }
-
-    /* Highlight Velocidad */
-    .card.highlight {
-      grid-column: span 2; 
-      background: linear-gradient(145deg, #1e293b, #0f172a);
-      border-color: var(--info);
-    }
+    .card.highlight { grid-column: span 2; background: linear-gradient(145deg, #1e293b, #0f172a); border-color: var(--info); }
     .highlight .value { font-size: 3rem; color: var(--info); }
     .highlight::before { background: var(--info); }
 
     /* ESTADOS */
-    .state-warning { border-color: var(--warning) !important; color: var(--warning); }
-    .state-warning .value { color: var(--warning); }
-    .state-warning::before { background: var(--warning); }
-
-    .state-success { border-color: var(--accent) !important; }
-    .state-success .value { color: var(--accent); }
-    .state-success::before { background: var(--accent); }
-
-    .state-danger { 
-      border-color: var(--danger) !important; 
-      box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
-      animation: pulse 1s infinite;
-    }
-    .state-danger .value { color: var(--danger); }
-    .state-danger::before { background: var(--danger); }
-
+    .state-warning { border-color: var(--warning) !important; } .state-warning .value { color: var(--warning); } .state-warning::before { background: var(--warning); }
+    .state-success { border-color: var(--accent) !important; } .state-success .value { color: var(--accent); } .state-success::before { background: var(--accent); }
+    .state-danger { border-color: var(--danger) !important; animation: pulse 1s infinite; } .state-danger .value { color: var(--danger); } .state-danger::before { background: var(--danger); }
     @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+
+    /* CONTENEDOR GRAFICO */
+    .chart-container {
+      width: 100%;
+      max-width: 600px;
+      background: var(--card-bg);
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      height: 300px;
+    }
   </style>
 </head>
 <body>
 
   <div class="nav-tabs">
     <button class="nav-btn active" onclick="filterCategory('user')">USUARIO</button>
+    <button class="nav-btn" onclick="filterCategory('graph')">GRÁFICAS</button>
     <button class="nav-btn" onclick="filterCategory('all')">TODO</button>
     <button class="nav-btn" onclick="filterCategory('motor')">MOTOR</button>
     <button class="nav-btn" onclick="filterCategory('aire')">AIRE/TURBO</button>
     <button class="nav-btn" onclick="filterCategory('elec')">ELEC/FUEL</button>
   </div>
 
-  <div class="dashboard-grid">
+  <div id="graph-view" class="chart-container hidden">
+    <canvas id="telemetryChart"></canvas>
+  </div>
+
+  <div id="cards-view" class="dashboard-grid">
     
     <div class="card highlight cat-all cat-motor cat-aire cat-elec cat-user" id="card-speed">
       <div class="label">Velocidad</div>
@@ -216,10 +194,10 @@
       <div class="label">Batería</div>
       <div><span class="value" id="voltage">--</span> <span class="unit">V</span></div>
     </div>
-
   </div>
 
   <script>
+    // --- MQTT ---
     const broker = "broker.emqx.io";
     const port = 8084;
     const topic = "coches/raspi1/telemetria";
@@ -241,92 +219,145 @@
       voltage: document.getElementById("voltage")
     };
 
-    function updateColors(data) {
-      // AGUA
-      setColor("card-temp", data.temp, 40, 95);
-      
-      // ACEITE
-      setColor("card-oil", data.oil, 50, 120);
-      
-      // BATERÍA (NUEVO)
-      // < 11.5: Rojo, 11.5-12.0: Amarillo, 12.0-14.8: Verde, > 14.8: Rojo
-      setColor("card-voltage", data.voltage, 12.0, 14.8); 
+    // --- CHART.JS SETUP ---
+    const ctx = document.getElementById('telemetryChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [], // Tiempo
+        datasets: [
+          {
+            label: 'Velocidad (km/h)',
+            data: [],
+            borderColor: '#3b82f6', // Azul
+            borderWidth: 2,
+            yAxisID: 'y',
+            tension: 0.4
+          },
+          {
+            label: 'RPM',
+            data: [],
+            borderColor: '#f59e0b', // Naranja
+            borderWidth: 2,
+            yAxisID: 'y1',
+            tension: 0.4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false, // Desactivar animación para rendimiento real-time
+        plugins: {
+          legend: { labels: { color: '#cbd5e1' } }
+        },
+        scales: {
+          x: { 
+            ticks: { color: '#64748b', maxTicksLimit: 6 },
+            grid: { color: '#334155' } 
+          },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            ticks: { color: '#3b82f6' },
+            grid: { color: '#334155' }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            ticks: { color: '#f59e0b' },
+            grid: { drawOnChartArea: false } // Para no ensuciar el grid
+          }
+        }
+      }
+    });
 
-      // FUEL (Lógica especial inversa, rojo si es bajo)
+    // --- COLORES ---
+    function updateColors(data) {
+      setColor("card-temp", data.temp, 40, 95);
+      setColor("card-oil", data.oil, 50, 120);
+      setColor("card-voltage", data.voltage, 12.0, 14.8);
       const elFuel = document.getElementById("card-fuel");
       elFuel.classList.remove('state-danger', 'state-success');
       if(data.fuel < 20) elFuel.classList.add('state-danger');
       else elFuel.classList.add('state-success');
     }
 
-    // Función genérica para rangos (minOk - maxOk es zona verde)
-    // Por debajo de minOk es warning (Amarillo)
-    // Por debajo de minOk - margen (o logica custom) podria ser rojo, 
-    // pero aqui simplificamos: Fuera de rango = Warning/Danger
     function setColor(cardId, val, minOk, maxOk) {
       const el = document.getElementById(cardId);
       el.classList.remove('state-warning', 'state-success', 'state-danger');
       if(val == 0 || val == undefined) return;
-
-      // Lógica general:
-      // Verde: Entre min y max
-      // Amarillo: Un poco por debajo del min (frio/bateria baja)
-      // Rojo: Muy por encima (caliente) o muy por debajo (bateria muerta)
-      
-      if (val >= minOk && val <= maxOk) {
-        el.classList.add('state-success'); // Verde
-      } else if (val < minOk) {
-         // Si es voltaje muy bajo (<11.5) o temperatura muy baja (<40)
-         // Para voltaje < 11.5 debería ser ROJO, entre 11.5 y 12 AMARILLO.
-         // Para simplificar con esta funcion:
+      if (val >= minOk && val <= maxOk) el.classList.add('state-success');
+      else if (val < minOk) {
          if (cardId === 'card-voltage' && val < 11.5) el.classList.add('state-danger');
          else el.classList.add('state-warning'); 
-      } else {
-        el.classList.add('state-danger'); // Rojo (Por encima del maximo)
-      }
+      } else el.classList.add('state-danger');
     }
 
+    // --- ACTUALIZAR GRAFICO ---
+    function updateChart(data) {
+        const now = new Date();
+        const timeStr = now.getHours() + ":" + now.getMinutes() + ":" + now.getSeconds();
+
+        // Añadir datos
+        chart.data.labels.push(timeStr);
+        chart.data.datasets[0].data.push(data.speed);
+        chart.data.datasets[1].data.push(data.rpm);
+
+        // Limitar a los últimos 20 puntos (aprox 20-30 segs)
+        if (chart.data.labels.length > 20) {
+            chart.data.labels.shift();
+            chart.data.datasets[0].data.shift();
+            chart.data.datasets[1].data.shift();
+        }
+        chart.update();
+    }
+
+    // --- FILTRADO TABS ---
     function filterCategory(cat) {
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
       event.target.classList.add('active');
-      const allCards = document.querySelectorAll('.card');
-      
-      allCards.forEach(card => {
-        // Primero ocultamos todas
-        card.classList.add('hidden');
+
+      const graphView = document.getElementById('graph-view');
+      const cardsView = document.getElementById('cards-view');
+
+      if (cat === 'graph') {
+        graphView.classList.remove('hidden');
+        cardsView.classList.add('hidden');
+      } else {
+        graphView.classList.add('hidden');
+        cardsView.classList.remove('hidden');
         
-        // Mostramos según la categoría
-        if (cat === 'all') {
-            if(card.classList.contains('cat-all')) card.classList.remove('hidden');
-        } else {
-            if(card.classList.contains('cat-' + cat)) card.classList.remove('hidden');
-        }
-      });
+        const allCards = document.querySelectorAll('.card');
+        allCards.forEach(card => {
+            card.classList.add('hidden');
+            if (cat === 'all') {
+                if(card.classList.contains('cat-all')) card.classList.remove('hidden');
+            } else {
+                if(card.classList.contains('cat-' + cat)) card.classList.remove('hidden');
+            }
+        });
+      }
     }
 
-    // Al cargar, activamos la pestaña USUARIO por defecto
-    window.onload = function() {
-        // Simulamos click en el primer botón (USUARIO)
-        document.querySelector('.nav-btn').click();
-    };
+    // Inicializar en USUARIO
+    window.onload = function() { document.querySelector('.nav-btn').click(); };
 
     client.onMessageArrived = (msg) => {
       try {
         const data = JSON.parse(msg.payloadString);
+        // Actualizar valores numéricos
         for (const [key, el] of Object.entries(cards)) {
             if(data[key] !== undefined) el.innerText = data[key];
         }
         updateColors(data);
+        updateChart(data); // <-- Aqui se actualiza la grafica
       } catch (e) { console.error(e); }
     };
 
-    client.connect({
-      useSSL: true,
-      onSuccess: () => {
-        console.log("Conectado");
-        client.subscribe(topic);
-      }
-    });
+    client.connect({ useSSL: true, onSuccess: () => { client.subscribe(topic); } });
   </script>
 </body>
 </html>
