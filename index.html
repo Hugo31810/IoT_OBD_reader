@@ -73,8 +73,13 @@
     /* GPS CARDS Y LOCATION VIEW STYLES */
     .gps-coords { font-size: 1.1rem; font-family: monospace; color: var(--text-main); display: flex; flex-direction: column; gap: 5px; }
     .gps-sats { font-size: 0.8rem; color: #94a3b8; margin-top: 8px; }
+    
+    /* ESTILO ESPECIFICO DE MAPA */
     #mapid { height: 350px; width: 100%; border-radius: 8px; border: 1px solid #334155; background-color: #334155; }
-    .location-info { background: var(--card-bg); border-radius: 12px; padding: 15px; margin-bottom: 15px; text-align: center; border: 1px solid #334155; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .location-info { 
+        background: var(--card-bg); border-radius: 12px; padding: 15px; margin-bottom: 15px; text-align: center; border: 1px solid #334155; box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
+    }
+    .location-info .gps-coords { font-size: 1.5rem; }
 
 
     /* GRÁFICOS */
@@ -137,7 +142,7 @@
 
   <div id="location-view" class="hidden">
     <div class="location-info">
-      <div class="label">Coordenadas Actuales</div>
+      <div class="label">UBICACIÓN ACTUAL Y ESTADO GPS</div>
       <div class="gps-coords">
         <div>Lat: <span id="map-lat">--.----</span></div>
         <div>Lon: <span id="map-lon">--.----</span></div>
@@ -156,9 +161,10 @@
       speed: document.getElementById("speed"), rpm: document.getElementById("rpm"), temp: document.getElementById("temp"), oil: document.getElementById("oil"), 
       map: document.getElementById("map"), load: document.getElementById("load"), fuel: document.getElementById("fuel"), voltage: document.getElementById("voltage"), 
       throttle: document.getElementById("throttle"), iat: document.getElementById("iat"), lambda: document.getElementById("lambda"), timing: document.getElementById("timing"),
-      // GPS Cards AÑADIDAS
+      // GPS Cards PRINCIPAL
       lat: document.getElementById("lat"), lon: document.getElementById("lon"), sats: document.getElementById("sats")
     };
+    // Elementos de la pestaña LOCALIZACIÓN
     const mapCoords = { lat: document.getElementById("map-lat"), lon: document.getElementById("map-lon"), sats: document.getElementById("map-sats") }
     
     // Almacena el ultimo valor para persistencia en tarjetas
@@ -175,7 +181,7 @@
     const ctx2 = document.getElementById('tempChart').getContext('2d');
     const tempChart = new Chart(ctx2, { type: 'line', data: { labels: [], datasets: [ { label: 'Agua', data: [], borderColor: '#22d3ee', borderWidth: 2, pointRadius: 0, tension: 0.4 }, { label: 'Aceite', data: [], borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, tension: 0.4 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' }, suggestedMin: 50, suggestedMax: 110 } } } });
 
-    // --- MAPA LEAFLET AÑADIDO ---
+    // --- MAPA LEAFLET ---
     let mymap = null; let marker = null;
 
     function initMap() {
@@ -192,11 +198,18 @@
     function updateMap(lat, lon, sats) {
       if (mymap === null) return;
       
+      // 1. Actualizar coordenadas en la PESTAÑA LOCALIZACIÓN
+      if (lat !== undefined) mapCoords.lat.innerText = lat.toFixed(6);
+      if (lon !== undefined) mapCoords.lon.innerText = lon.toFixed(6);
+      if (sats !== undefined) mapCoords.sats.innerText = sats;
+
+
       if (lat === 0 || lon === 0 || sats === 0) {
         if (marker) marker.setLatLng([0, 0]).bindPopup("Esperando señal GPS...").openPopup();
         return;
       }
       
+      // 2. Actualizar Mapa
       const newLatLng = new L.LatLng(lat, lon);
       if (marker) {
         marker.setLatLng(newLatLng);
@@ -205,19 +218,15 @@
       if (!document.getElementById('location-view').classList.contains('hidden')) {
            mymap.setView(newLatLng, 16); 
       }
-      
-      mapCoords.lat.innerText = lat.toFixed(6);
-      mapCoords.lon.innerText = lon.toFixed(6);
-      mapCoords.sats.innerText = sats;
     }
-    // --- FIN MAPA LEAFLET ---
 
 
     // --- LÓGICA DE PERSISTENCIA Y ACTUALIZACIÓN ---
 
     function updateDataAndState(data) {
         let currentValues = {};
-        const updateAlwaysMetrics = ['speed', 'rpm', 'voltage', 'fuel', 'lat', 'lon', 'sats']; // GPS incluido
+        // Métricas que pueden ser 0 de forma válida
+        const updateAlwaysMetrics = ['speed', 'rpm', 'voltage', 'fuel', 'lat', 'lon', 'sats']; 
 
         for (const [key, el] of Object.entries(cards)) { 
             const value = data[key];
@@ -225,7 +234,7 @@
             if (value !== undefined) {
                 
                 if (updateAlwaysMetrics.includes(key)) {
-                    // FIX CLAVE A: Actualizar siempre. Aceptar 0 para Speed/RPM/Voltaje/Fuel/GPS
+                    // Actualizar siempre.
                     el.innerText = value;
                     lastDisplayedValues[key] = value;
                     currentValues[key] = value;
@@ -235,8 +244,7 @@
                     lastDisplayedValues[key] = value;
                     currentValues[key] = value;
                 } else {
-                    // FIX CLAVE B: Si el valor es 0 o indefinido, usar el valor persistente para el display y la gráfica
-                    // Esto evita que Temp/Oil/MAP caigan a 0.
+                    // Si el valor es 0 o indefinido, usar el valor persistente para el display y la gráfica
                     el.innerText = lastDisplayedValues[key] > 0 ? lastDisplayedValues[key] : "--";
                     currentValues[key] = lastDisplayedValues[key]; 
                 }
@@ -250,7 +258,7 @@
         updateStatus(currentValues);
         updateCharts(currentValues); 
         
-        // Llamada al mapa
+        // Llamada al mapa (utiliza los valores persistentes de currentValues)
         updateMap(currentValues.lat, currentValues.lon, currentValues.sats);
     }
 
@@ -300,7 +308,7 @@
       if (cat === 'graph') {
         views.graph.classList.remove('hidden');
         perfChart.resize(); tempChart.resize();
-      } else if (cat === 'location') { // LÓGICA DE LOCALIZACIÓN AÑADIDA
+      } else if (cat === 'location') { // LÓGICA DE LOCALIZACIÓN
         views.location.classList.remove('hidden');
         if (mymap === null) initMap();
         
