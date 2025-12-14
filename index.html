@@ -2,12 +2,15 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Monitor de Vehiculo</title>
+  <title>Monitor de Vehiculo GPS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoMdUfW4E1kP/d+v8Lg/dK0pQ5g5O3p5K5S5B5C=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-2eHHGbbnOV3pDfoIBf/lSdoLz9KGGbuLcwngh7lyxM=" crossorigin=""></script>
 
   <style>
     :root {
@@ -49,7 +52,7 @@
     .dashboard-grid {
       display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 600px; margin-bottom: 20px;
     }
-    #graph-view {
+    #graph-view, #location-view {
       width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 15px;
     }
     .hidden { display: none !important; }
@@ -67,6 +70,13 @@
     .card.highlight { grid-column: span 2; background: linear-gradient(145deg, #1e293b, #0f172a); border-color: var(--info); }
     .highlight .value { font-size: 3.5rem; color: var(--info); } .highlight::before { background: var(--info); opacity: 1; }
     
+    /* GPS CARDS Y LOCATION VIEW STYLES */
+    .gps-coords { font-size: 1.1rem; font-family: monospace; color: var(--text-main); display: flex; flex-direction: column; gap: 5px; }
+    .gps-sats { font-size: 0.8rem; color: #94a3b8; margin-top: 8px; }
+    #mapid { height: 350px; width: 100%; border-radius: 8px; border: 1px solid #334155; background-color: #334155; }
+    .location-info { background: var(--card-bg); border-radius: 12px; padding: 15px; margin-bottom: 15px; text-align: center; border: 1px solid #334155; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+
     /* GRÁFICOS */
     .chart-container {
       width: 100%; background: var(--card-bg); padding: 15px; border-radius: 12px;
@@ -89,7 +99,7 @@
   <div class="nav-tabs">
     <button class="nav-btn active" onclick="filterCategory('user')">PRINCIPAL</button>
     <button class="nav-btn" onclick="filterCategory('graph')">HISTÓRICO</button>
-    <button class="nav-btn" onclick="filterCategory('all')">TÉCNICO (TODO)</button>
+    <button class="nav-btn" onclick="filterCategory('location')">LOCALIZACIÓN</button> <button class="nav-btn" onclick="filterCategory('all')">TÉCNICO (TODO)</button>
     <button class="nav-btn" onclick="filterCategory('motor')">MOTOR</button>
     <button class="nav-btn" onclick="filterCategory('elec')">SISTEMAS</button>
   </div>
@@ -98,10 +108,18 @@
     
     <div class="card highlight cat-all cat-motor cat-elec cat-user" id="card-speed"><div class="label">Velocidad</div><div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div></div>
     
+    <div class="card cat-all cat-user cat-elec" style="border-color: var(--info);">
+      <div class="label">Posicion GPS</div>
+      <div class="gps-coords">
+        <div>Lat: <span id="lat">--.----</span></div>
+        <div>Lon: <span id="lon">--.----</span></div>
+      </div>
+      <div class="gps-sats">Satélites: <span id="sats">0</span></div>
+    </div>
     <div class="card cat-all cat-motor cat-user" id="card-temp"><div class="label">Temp. Agua</div><div><span class="value" id="temp">--</span> <span class="unit">°C</span></div></div>
     <div class="card cat-all cat-motor cat-user" id="card-oil"><div class="label">Temp. Aceite</div><div><span class="value" id="oil">--</span> <span class="unit">°C</span></div></div>
     <div class="card cat-all cat-elec cat-user" id="card-fuel"><div class="label">Combustible</div><div><span class="value" id="fuel">--</span> <span class="unit">%</span></div></div>
-    <div class="card cat-all cat-elec cat-user" id="card-voltage"><div class="label">Batería</div><div><span class="value" id="voltage">--</span> <span class="unit">V</span></div></div>
+    <div class="card cat-all cat-elec cat-user" id="card-voltage"><div class="label">Bateria</div><div><span class="value" id="voltage">--</span> <span class="unit">V</span></div></div>
 
     <div class="card cat-all cat-motor" id="card-rpm"><div class="label">RPM</div><div><span class="value" id="rpm">--</span></div></div>
     <div class="card cat-all cat-motor" id="card-map"><div class="label">Presion MAP</div><div><span class="value" id="map">--</span> <span class="unit">kPa</span></div></div>
@@ -117,37 +135,89 @@
     <div class="chart-container"><div class="chart-header">Temperatura Motor (Agua / Aceite)</div><canvas id="tempChart"></canvas></div>
   </div>
 
+  <div id="location-view" class="hidden">
+    <div class="location-info">
+      <div class="label">Coordenadas Actuales</div>
+      <div class="gps-coords">
+        <div>Lat: <span id="map-lat">--.----</span></div>
+        <div>Lon: <span id="map-lon">--.----</span></div>
+      </div>
+      <div class="gps-sats">Satélites: <span id="map-sats">0</span></div>
+    </div>
+    <div id="mapid"></div>
+  </div>
   <script>
-    // --- CONFIGURACIÓN MQTT Y DOM ---
+    // --- CONFIGURACIÓN MQTT ---
     const broker = "broker.emqx.io"; const port = 8084; const topic = "coches/raspi1/telemetria";
-    const clientID = "fleet_stable_" + Math.random().toString(16).substr(2, 8);
+    const clientID = "fleet_gps_final_" + Math.random().toString(16).substr(2, 8);
     const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
 
     const cards = { 
       speed: document.getElementById("speed"), rpm: document.getElementById("rpm"), temp: document.getElementById("temp"), oil: document.getElementById("oil"), 
       map: document.getElementById("map"), load: document.getElementById("load"), fuel: document.getElementById("fuel"), voltage: document.getElementById("voltage"), 
-      throttle: document.getElementById("throttle"), iat: document.getElementById("iat"), lambda: document.getElementById("lambda"), timing: document.getElementById("timing")
+      throttle: document.getElementById("throttle"), iat: document.getElementById("iat"), lambda: document.getElementById("lambda"), timing: document.getElementById("timing"),
+      // GPS Cards AÑADIDAS
+      lat: document.getElementById("lat"), lon: document.getElementById("lon"), sats: document.getElementById("sats")
     };
+    const mapCoords = { lat: document.getElementById("map-lat"), lon: document.getElementById("map-lon"), sats: document.getElementById("map-sats") }
     
     // Almacena el ultimo valor para persistencia en tarjetas
     const lastDisplayedValues = { 
         speed: 0, rpm: 0, temp: 0, oil: 0, map: 0, load: 0, fuel: 0, voltage: 0, 
-        throttle: 0, iat: 0, lambda: 0, timing: 0
+        throttle: 0, iat: 0, lambda: 0, timing: 0,
+        lat: 0, lon: 0, sats: 0 // Valores GPS
     };
 
 
-    // --- GRÁFICOS ---
+    // --- GRÁFICOS (Mantenidos) ---
     const ctx1 = document.getElementById('perfChart').getContext('2d');
     const perfChart = new Chart(ctx1, { type: 'line', data: { labels: [], datasets: [ { label: 'Velocidad', data: [], borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y', pointRadius: 0, tension: 0.3 }, { label: 'RPM', data: [], borderColor: '#f59e0b', borderWidth: 2, yAxisID: 'y1', pointRadius: 0, tension: 0.3 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { type: 'linear', position: 'left', ticks: { color: '#3b82f6' }, grid: { color: '#334155' } }, y1: { type: 'linear', display: true, position: 'right', ticks: { color: '#f59e0b', callback: v => v/1000 + 'k' }, grid: { drawOnChartArea: false } } } } });
     const ctx2 = document.getElementById('tempChart').getContext('2d');
     const tempChart = new Chart(ctx2, { type: 'line', data: { labels: [], datasets: [ { label: 'Agua', data: [], borderColor: '#22d3ee', borderWidth: 2, pointRadius: 0, tension: 0.4 }, { label: 'Aceite', data: [], borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, tension: 0.4 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' }, suggestedMin: 50, suggestedMax: 110 } } } });
+
+    // --- MAPA LEAFLET AÑADIDO ---
+    let mymap = null; let marker = null;
+
+    function initMap() {
+      if (mymap !== null) mymap.remove();
+      mymap = L.map('mapid').setView([40.4168, -3.7038], 13); // Centro inicial Madrid
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(mymap);
+
+      marker = L.marker([0, 0]).addTo(mymap);
+    }
+
+    function updateMap(lat, lon, sats) {
+      if (mymap === null) return;
+      
+      if (lat === 0 || lon === 0 || sats === 0) {
+        if (marker) marker.setLatLng([0, 0]).bindPopup("Esperando señal GPS...").openPopup();
+        return;
+      }
+      
+      const newLatLng = new L.LatLng(lat, lon);
+      if (marker) {
+        marker.setLatLng(newLatLng);
+        marker.setPopupContent(`Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}<br>Satélites: ${sats}`).openPopup();
+      }
+      if (!document.getElementById('location-view').classList.contains('hidden')) {
+           mymap.setView(newLatLng, 16); 
+      }
+      
+      mapCoords.lat.innerText = lat.toFixed(6);
+      mapCoords.lon.innerText = lon.toFixed(6);
+      mapCoords.sats.innerText = sats;
+    }
+    // --- FIN MAPA LEAFLET ---
 
 
     // --- LÓGICA DE PERSISTENCIA Y ACTUALIZACIÓN ---
 
     function updateDataAndState(data) {
         let currentValues = {};
-        const updateAlwaysMetrics = ['speed', 'rpm', 'voltage', 'fuel']; 
+        const updateAlwaysMetrics = ['speed', 'rpm', 'voltage', 'fuel', 'lat', 'lon', 'sats']; // GPS incluido
 
         for (const [key, el] of Object.entries(cards)) { 
             const value = data[key];
@@ -155,17 +225,18 @@
             if (value !== undefined) {
                 
                 if (updateAlwaysMetrics.includes(key)) {
-                    // Velocidad/RPM/Voltaje/Fuel: Actualizar siempre, incluso si es 0
+                    // FIX CLAVE A: Actualizar siempre. Aceptar 0 para Speed/RPM/Voltaje/Fuel/GPS
                     el.innerText = value;
                     lastDisplayedValues[key] = value;
                     currentValues[key] = value;
                 } else if (value > 0) {
-                    // Para Temp/Oil/MAP/etc.: Solo si es POSITIVO (> 0), lo actualizamos.
+                    // Temp/Oil/MAP/etc.: Solo si es POSITIVO (> 0), lo actualizamos.
                     el.innerText = value;
                     lastDisplayedValues[key] = value;
                     currentValues[key] = value;
                 } else {
-                    // Si es 0 o indefinido, usar el valor persistente para el display y la gráfica
+                    // FIX CLAVE B: Si el valor es 0 o indefinido, usar el valor persistente para el display y la gráfica
+                    // Esto evita que Temp/Oil/MAP caigan a 0.
                     el.innerText = lastDisplayedValues[key] > 0 ? lastDisplayedValues[key] : "--";
                     currentValues[key] = lastDisplayedValues[key]; 
                 }
@@ -178,6 +249,9 @@
         // Ejecutar lógicas de color y gráfica con los valores persistentes.
         updateStatus(currentValues);
         updateCharts(currentValues); 
+        
+        // Llamada al mapa
+        updateMap(currentValues.lat, currentValues.lon, currentValues.sats);
     }
 
     function updateStatus(data) {
@@ -199,7 +273,7 @@
         const speedVal = data.speed;
         const rpmVal = data.rpm;
         
-        // Temperaturas: si el valor es 0, usamos NaN para que la línea no caiga.
+        // Temperaturas/Presiones: si el valor persistente es 0, usamos NaN para que la línea no caiga.
         const tempVal = data.temp > 0 ? data.temp : NaN; 
         const oilVal = data.oil > 0 ? data.oil : NaN;
 
@@ -219,13 +293,20 @@
     function filterCategory(cat) {
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); event.target.classList.add('active');
 
-      const views = { cards: document.getElementById('cards-view'), graph: document.getElementById('graph-view') };
+      const views = { cards: document.getElementById('cards-view'), graph: document.getElementById('graph-view'), location: document.getElementById('location-view') };
 
       for (let key in views) views[key].classList.add('hidden');
 
       if (cat === 'graph') {
         views.graph.classList.remove('hidden');
         perfChart.resize(); tempChart.resize();
+      } else if (cat === 'location') { // LÓGICA DE LOCALIZACIÓN AÑADIDA
+        views.location.classList.remove('hidden');
+        if (mymap === null) initMap();
+        
+        // FIX CLAVE: Invalidar tamaño después de mostrar el contenedor.
+        setTimeout(() => { if (mymap) mymap.invalidateSize(); }, 50); 
+        
       } else { 
         views.cards.classList.remove('hidden');
         document.querySelectorAll('.card').forEach(card => { 
