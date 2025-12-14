@@ -129,7 +129,7 @@
     };
     const mapCoords = { lat: document.getElementById("map-lat"), lon: document.getElementById("map-lon"), sats: document.getElementById("map-sats") }
 
-    // Almacena el último valor no-cero válido para cada métrica.
+    // Almacena el último valor recibido para mantener la visualización de las tarjetas.
     const lastDisplayedValues = { 
         speed: 0, rpm: 0, temp: 0, oil: 0, map: 0, load: 0, fuel: 0, voltage: 0, 
         lat: 0, lon: 0, sats: 0, throttle: 0, iat: 0, lambda: 0, timing: 0
@@ -159,7 +159,7 @@
     function updateMap(lat, lon, sats) {
       if (mymap === null) return;
       
-      // La persistencia de Lat/Lon/Sats se gestiona en updateCardsAndState
+      // La persistencia de Lat/Lon/Sats se gestiona en updateDataAndState
       if (lat === 0 || lon === 0 || sats === 0) {
         if (marker) marker.setLatLng([0, 0]).bindPopup("Esperando señal GPS...").openPopup();
         return;
@@ -180,46 +180,37 @@
     }
 
 
-    // --- LÓGICA DE PERSISTENCIA Y ACTUALIZACIÓN ---
+    // --- LÓGICA DE PERSISTENCIA Y ACTUALIZACIÓN (SIMPLIFICADA) ---
 
-    function updateCardsAndState(data) {
+    function updateDataAndState(data) {
         let currentValues = {};
-        const nonZeroMetrics = ['temp', 'oil', 'map', 'load', 'iat', 'lambda', 'timing', 'lat', 'lon', 'sats'];
-        const updateAlwaysMetrics = ['speed', 'rpm', 'voltage', 'fuel']; // Estos pueden ser 0 de forma válida
-
+        
+        // 1. Actualizar Tarjetas (Display y Persistencia)
         for (const [key, el] of Object.entries(cards)) { 
             const value = data[key];
 
+            // Si el valor viene, lo usamos; si no viene, usamos el último.
             if (value !== undefined) {
-                if (updateAlwaysMetrics.includes(key)) {
-                    // Velocidad/RPM/Voltaje/Fuel: Actualizar siempre, incluso si es 0
+                
+                if (key === 'speed' || key === 'rpm' || key === 'voltage' || key === 'fuel' || key === 'sats') {
+                    // Estos pueden ser 0 (el coche parado). Actualizar siempre.
                     el.innerText = value;
                     lastDisplayedValues[key] = value;
-                    currentValues[key] = value;
-                } else if (nonZeroMetrics.includes(key)) {
-                    // Temp/Oil/MAP/etc.: Solo actualizar si el valor es POSITIVO (> 0)
-                    if (value > 0) {
-                        el.innerText = value;
-                        lastDisplayedValues[key] = value;
-                        currentValues[key] = value;
-                    } else {
-                        // Si es 0 o indefinido, usar el valor persistente para el display y la gráfica
-                        el.innerText = lastDisplayedValues[key] > 0 ? lastDisplayedValues[key] : "--";
-                        currentValues[key] = lastDisplayedValues[key]; 
-                    }
-                } else {
-                    // Métricas GPS: Actualizar siempre
+                } else if (value > 0) {
+                    // Para Temp/Oil/MAP/etc.: Solo si es POSITIVO (> 0), lo actualizamos.
                     el.innerText = value;
                     lastDisplayedValues[key] = value;
-                    currentValues[key] = value;
-                }
-            } else {
-                // Si el dato no viene en el payload (no debería pasar con el último Python), usar persistencia
-                currentValues[key] = lastDisplayedValues[key];
+                } 
+                // Si el valor es 0 o indefinido y NO es una métrica de 'actualizar siempre', 
+                // MANTENEMOS el valor anterior en el display (el.innerText = lastDisplayedValues[key]).
+                // Para las gráficas, usaremos el valor persistente de lastDisplayedValues.
             }
+
+            // Usamos el valor más reciente (ya sea el nuevo o el persistente)
+            currentValues[key] = lastDisplayedValues[key];
         }
         
-        // Ejecutar lógicas de color y gráfica con los valores persistentes.
+        // 2. Ejecutar lógicas de color, gráfico y mapa con los valores persistentes.
         updateStatus(currentValues);
         updateCharts(currentValues); 
         updateMap(currentValues.lat, currentValues.lon, currentValues.sats);
@@ -241,11 +232,11 @@
     function updateCharts(data) {
         const timeStr = new Date().getSeconds();
         
-        // RPM y Speed pueden ser 0, los aceptamos
+        // FIX CLAVE: IGNORAR 0s para Temperaturas/Oil (usando NaN) para que la línea no caiga.
+        // Las gráficas aceptan NaN para dibujar una línea recta entre los puntos válidos.
         const speedVal = data.speed;
         const rpmVal = data.rpm;
         
-        // Las Temperaturas deben ser > 0 (si el motor está caliente), si son 0, usamos NaN para que la línea sea recta.
         const tempVal = data.temp > 0 ? data.temp : NaN; 
         const oilVal = data.oil > 0 ? data.oil : NaN;
 
@@ -297,7 +288,7 @@
     client.onMessageArrived = (msg) => { 
       try { 
         const data = JSON.parse(msg.payloadString);
-        updateCardsAndState(data); // LLamada a la función de persistencia
+        updateDataAndState(data); // LLamada a la función de persistencia simplificada
       } catch (e) { console.error(e); } 
     };
 
