@@ -12,10 +12,10 @@
       --bg-color: #0f172a;
       --card-bg: #1e293b;
       --text-main: #f8fafc;
-      --accent: #10b981;  /* Verde */
-      --danger: #ef4444;  /* Rojo */
-      --warning: #f59e0b; /* Amarillo */
-      --info: #3b82f6;    /* Azul */
+      --accent: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --info: #3b82f6;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,7 +31,7 @@
       padding: 10px;
     }
 
-    /* --- MENU DE PESTAÑAS (TABS) --- */
+    /* TABS */
     .nav-tabs {
       display: flex;
       gap: 10px;
@@ -41,7 +41,7 @@
       border-radius: 10px;
       width: 100%;
       max-width: 600px;
-      overflow-x: auto; /* Scroll si es movil pequeño */
+      overflow-x: auto;
     }
 
     .nav-btn {
@@ -63,7 +63,7 @@
       box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
     }
 
-    /* --- GRID --- */
+    /* GRID */
     .dashboard-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -73,7 +73,7 @@
       margin-bottom: 20px;
     }
 
-    /* --- TARJETAS --- */
+    /* TARJETAS */
     .card {
       background: var(--card-bg);
       border-radius: 12px;
@@ -82,15 +82,12 @@
       border: 1px solid #334155;
       position: relative;
       overflow: hidden;
-      display: flex; /* Para ocultar/mostrar facil */
+      display: flex;
       flex-direction: column;
       align-items: center;
     }
 
-    /* Clase para ocultar tarjetas al filtrar */
-    .hidden {
-      display: none;
-    }
+    .hidden { display: none; }
 
     .card::before {
       content: '';
@@ -119,7 +116,7 @@
       color: #64748b;
     }
 
-    /* Highlight para Velocidad y RPM */
+    /* Highlight Velocidad */
     .card.highlight {
       grid-column: span 2; 
       background: linear-gradient(145deg, #1e293b, #0f172a);
@@ -128,7 +125,7 @@
     .highlight .value { font-size: 3rem; color: var(--info); }
     .highlight::before { background: var(--info); }
 
-    /* --- ESTADOS DE COLOR --- */
+    /* ESTADOS */
     .state-warning { border-color: var(--warning) !important; color: var(--warning); }
     .state-warning .value { color: var(--warning); }
     .state-warning::before { background: var(--warning); }
@@ -146,7 +143,6 @@
     .state-danger::before { background: var(--danger); }
 
     @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
-
   </style>
 </head>
 <body>
@@ -160,7 +156,7 @@
 
   <div class="dashboard-grid">
     
-    <div class="card highlight cat-all cat-elec" id="card-speed">
+    <div class="card highlight cat-all cat-motor cat-aire cat-elec" id="card-speed">
       <div class="label">Velocidad</div>
       <div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div>
     </div>
@@ -223,15 +219,12 @@
   </div>
 
   <script>
-    // --- MQTT SETUP ---
     const broker = "broker.emqx.io";
     const port = 8084;
     const topic = "coches/raspi1/telemetria";
     const clientID = "rally_dash_" + Math.random().toString(16).substr(2, 8);
-
     const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
 
-    // --- ELEMENTOS UI ---
     const cards = {
       speed: document.getElementById("speed"),
       rpm: document.getElementById("rpm"),
@@ -247,15 +240,9 @@
       voltage: document.getElementById("voltage")
     };
 
-    // --- LOGICA DE COLORES ---
     function updateColors(data) {
-      // AGUA (Amarillo < 40, Verde ok, Rojo > 95)
       setColor("card-temp", data.temp, 40, 95);
-      
-      // ACEITE (Amarillo < 50, Verde ok, Rojo > 120)
       setColor("card-oil", data.oil, 50, 120);
-
-      // FUEL (Rojo < 20, Verde ok)
       const elFuel = document.getElementById("card-fuel");
       elFuel.classList.remove('state-danger', 'state-success');
       if(data.fuel < 20) elFuel.classList.add('state-danger');
@@ -266,46 +253,33 @@
       const el = document.getElementById(cardId);
       el.classList.remove('state-warning', 'state-success', 'state-danger');
       if(val == 0 || val == undefined) return;
-
       if(val < minOk) el.classList.add('state-warning');
       else if (val > maxOk) el.classList.add('state-danger');
       else el.classList.add('state-success');
     }
 
-    // --- FILTRADO DE PESTAÑAS ---
     function filterCategory(cat) {
-      // 1. Gestionar botones activos
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
       event.target.classList.add('active');
-
-      // 2. Filtrar tarjetas
       const allCards = document.querySelectorAll('.card');
       allCards.forEach(card => {
         if (cat === 'all') {
-            // Mostrar si tiene la clase cat-all
             if(card.classList.contains('cat-all')) card.classList.remove('hidden');
             else card.classList.add('hidden');
         } else {
-            // Mostrar si tiene la clase especifica
             if(card.classList.contains('cat-' + cat)) card.classList.remove('hidden');
             else card.classList.add('hidden');
         }
       });
     }
 
-    // --- RECEPCION MQTT ---
     client.onMessageArrived = (msg) => {
       try {
         const data = JSON.parse(msg.payloadString);
-        
-        // Actualizar Textos
         for (const [key, el] of Object.entries(cards)) {
             if(data[key] !== undefined) el.innerText = data[key];
         }
-        
-        // Actualizar Colores
         updateColors(data);
-
       } catch (e) { console.error(e); }
     };
 
