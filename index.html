@@ -2,22 +2,20 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Monitor Telemetría OBD-II</title>
+  <title>Rally Telemetry Pro</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;500;700;900&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 
   <style>
-    /* --- ESTILOS GENERALES --- */
     :root {
-      --bg-color: #0f172a;       /* Azul muy oscuro */
-      --card-bg: #1e293b;        /* Azul grisáceo */
-      --text-main: #f8fafc;      /* Blanco roto */
-      --accent: #10b981;         /* Verde esmeralda (Ok) */
-      --accent-dim: rgba(16, 185, 129, 0.1);
-      --danger: #ef4444;         /* Rojo (Peligro/Reserva) */
-      --warning: #f59e0b;        /* Amarillo (Frío/Aviso) */
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --text-main: #f8fafc;
+      --accent: #10b981;  /* Verde */
+      --danger: #ef4444;  /* Rojo */
+      --warning: #f59e0b; /* Amarillo */
+      --info: #3b82f6;    /* Azul */
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -30,322 +28,292 @@
       flex-direction: column;
       align-items: center;
       min-height: 100vh;
-      padding: 20px;
+      padding: 10px;
     }
 
-    /* --- ENCABEZADO --- */
-    header {
+    /* --- MENU DE PESTAÑAS (TABS) --- */
+    .nav-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      background: #1e293b;
+      padding: 5px;
+      border-radius: 10px;
       width: 100%;
       max-width: 600px;
-      margin-bottom: 25px;
-      text-align: center;
-      padding-bottom: 15px;
-      border-bottom: 1px solid #334155;
+      overflow-x: auto; /* Scroll si es movil pequeño */
     }
 
-    h1 {
+    .nav-btn {
+      flex: 1;
+      padding: 10px;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
       font-weight: 700;
-      font-size: 1.5rem;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 5px;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.3s;
+      white-space: nowrap;
     }
 
-    .subtitle {
-      font-size: 0.9rem;
-      color: #94a3b8;
+    .nav-btn.active {
+      background: var(--info);
+      color: white;
+      box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
     }
-
-    #connection-pill {
-      display: inline-block;
-      padding: 6px 16px;
-      border-radius: 50px;
-      font-size: 0.85rem;
-      font-weight: 500;
-      background: rgba(255,255,255,0.05);
-      color: #94a3b8;
-      margin-top: 10px;
-      transition: all 0.3s ease;
-    }
-    
-    .status-active { background: var(--accent-dim) !important; color: var(--accent) !important; border: 1px solid var(--accent); }
-    .status-error { background: rgba(239, 68, 68, 0.1) !important; color: var(--danger) !important; border: 1px solid var(--danger); }
 
     /* --- GRID --- */
     .dashboard-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 15px;
+      gap: 12px;
       width: 100%;
       max-width: 600px;
+      margin-bottom: 20px;
     }
 
     /* --- TARJETAS --- */
     .card {
       background: var(--card-bg);
-      border-radius: 16px;
-      padding: 20px;
+      border-radius: 12px;
+      padding: 15px;
       text-align: center;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
       border: 1px solid #334155;
       position: relative;
       overflow: hidden;
-      transition: all 0.3s ease;
+      display: flex; /* Para ocultar/mostrar facil */
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Clase para ocultar tarjetas al filtrar */
+    .hidden {
+      display: none;
     }
 
     .card::before {
       content: '';
       position: absolute;
       top: 0; left: 0; width: 100%; height: 4px;
-      background: var(--accent);
+      background: #64748b;
       opacity: 0.7;
     }
 
     .label {
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       text-transform: uppercase;
-      letter-spacing: 1.5px;
+      letter-spacing: 1px;
       color: #94a3b8;
-      margin-bottom: 10px;
-      font-weight: 500;
-    }
-
-    .value-container {
-      display: flex;
-      justify-content: center;
-      align-items: baseline;
-      gap: 4px;
+      margin-bottom: 5px;
     }
 
     .value {
-      font-size: 2.2rem;
+      font-size: 2rem;
       font-weight: 700;
       color: var(--text-main);
     }
 
     .unit {
-      font-size: 0.9rem;
+      font-size: 0.8rem;
       color: #64748b;
-      font-weight: 400;
     }
 
-    /* Tarjeta Velocidad Grande */
+    /* Highlight para Velocidad y RPM */
     .card.highlight {
       grid-column: span 2; 
       background: linear-gradient(145deg, #1e293b, #0f172a);
-      border-color: var(--accent);
+      border-color: var(--info);
     }
-    .highlight .value { color: var(--accent); font-size: 3.5rem; }
+    .highlight .value { font-size: 3rem; color: var(--info); }
+    .highlight::before { background: var(--info); }
 
-    /* --- ESTADOS DE COLOR (GLOBALES) --- */
-    
-    /* Amarillo (Warning / Frío) */
-    .card.state-warning {
-      border-color: var(--warning) !important;
-      box-shadow: 0 0 10px rgba(245, 158, 11, 0.1);
-    }
-    .card.state-warning .value { color: var(--warning); }
-    .card.state-warning::before { background: var(--warning); }
+    /* --- ESTADOS DE COLOR --- */
+    .state-warning { border-color: var(--warning) !important; color: var(--warning); }
+    .state-warning .value { color: var(--warning); }
+    .state-warning::before { background: var(--warning); }
 
-    /* Verde (Success / Normal) */
-    .card.state-success {
-      border-color: var(--accent) !important;
-    }
-    .card.state-success .value { color: var(--accent); }
-    .card.state-success::before { background: var(--accent); }
+    .state-success { border-color: var(--accent) !important; }
+    .state-success .value { color: var(--accent); }
+    .state-success::before { background: var(--accent); }
 
-    /* Rojo (Danger / Caliente / Reserva) */
-    .card.state-danger {
-      border-color: var(--danger) !important;
-      background: rgba(239, 68, 68, 0.05);
-      box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
-      animation: pulse-danger 1s infinite;
+    .state-danger { 
+      border-color: var(--danger) !important; 
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+      animation: pulse 1s infinite;
     }
-    .card.state-danger .value { color: var(--danger); }
-    .card.state-danger::before { background: var(--danger); }
+    .state-danger .value { color: var(--danger); }
+    .state-danger::before { background: var(--danger); }
 
-    @keyframes pulse-danger {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.02); }
-      100% { transform: scale(1); }
-    }
-
-    footer {
-      margin-top: 40px;
-      font-size: 0.7rem;
-      color: #475569;
-    }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
 
   </style>
 </head>
 <body>
 
-  <header>
-    <h1>Telemetría 4G</h1>
-    <div class="subtitle">Raspberry Pi + OBD-II + MQTT</div>
-    <div id="connection-pill">Esperando conexión...</div>
-  </header>
+  <div class="nav-tabs">
+    <button class="nav-btn active" onclick="filterCategory('all')">TODO</button>
+    <button class="nav-btn" onclick="filterCategory('motor')">MOTOR</button>
+    <button class="nav-btn" onclick="filterCategory('aire')">AIRE/TURBO</button>
+    <button class="nav-btn" onclick="filterCategory('elec')">ELEC/FUEL</button>
+  </div>
 
   <div class="dashboard-grid">
     
-    <div class="card highlight">
+    <div class="card highlight cat-all cat-elec" id="card-speed">
       <div class="label">Velocidad</div>
-      <div class="value-container">
-        <span class="value" id="speed">--</span>
-        <span class="unit">km/h</span>
-      </div>
+      <div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div>
     </div>
 
-    <div class="card">
-      <div class="label">Motor</div>
-      <div class="value-container">
-        <span class="value" id="rpm">--</span>
-        <span class="unit">rpm</span>
-      </div>
+    <div class="card cat-all cat-motor" id="card-rpm">
+      <div class="label">RPM</div>
+      <div><span class="value" id="rpm">--</span></div>
     </div>
 
-    <div class="card" id="card-temp">
-      <div class="label">Temp</div>
-      <div class="value-container">
-        <span class="value" id="temp">--</span>
-        <span class="unit">°C</span>
-      </div>
+    <div class="card cat-all cat-motor" id="card-temp">
+      <div class="label">Agua</div>
+      <div><span class="value" id="temp">--</span> <span class="unit">°C</span></div>
     </div>
 
-    <div class="card">
+    <div class="card cat-all cat-motor" id="card-oil">
+      <div class="label">Aceite</div>
+      <div><span class="value" id="oil">--</span> <span class="unit">°C</span></div>
+    </div>
+
+    <div class="card cat-all cat-aire" id="card-map">
+      <div class="label">Turbo (MAP)</div>
+      <div><span class="value" id="map">--</span> <span class="unit">kPa</span></div>
+    </div>
+
+    <div class="card cat-all cat-aire" id="card-iat">
+      <div class="label">Aire Adm.</div>
+      <div><span class="value" id="iat">--</span> <span class="unit">°C</span></div>
+    </div>
+
+    <div class="card cat-all cat-motor" id="card-load">
       <div class="label">Carga</div>
-      <div class="value-container">
-        <span class="value" id="load">--</span> <span class="unit">%</span>
-      </div>
+      <div><span class="value" id="load">--</span> <span class="unit">%</span></div>
     </div>
 
-    <div class="card">
+    <div class="card cat-all cat-aire" id="card-throttle">
       <div class="label">Pedal</div>
-      <div class="value-container">
-        <span class="value" id="throttle">--</span>
-        <span class="unit">%</span>
-      </div>
+      <div><span class="value" id="throttle">--</span> <span class="unit">%</span></div>
     </div>
 
-    <div class="card" id="card-fuel">
+    <div class="card cat-all cat-aire" id="card-lambda">
+      <div class="label">Lambda</div>
+      <div><span class="value" id="lambda">--</span> <span class="unit">λ</span></div>
+    </div>
+
+    <div class="card cat-motor" id="card-timing">
+      <div class="label">Avance</div>
+      <div><span class="value" id="timing">--</span> <span class="unit">°</span></div>
+    </div>
+
+    <div class="card cat-all cat-elec" id="card-fuel">
       <div class="label">Fuel</div>
-      <div class="value-container">
-        <span class="value" id="fuel">--</span>
-        <span class="unit">%</span>
-      </div>
+      <div><span class="value" id="fuel">--</span> <span class="unit">%</span></div>
     </div>
 
-    <div class="card">
+    <div class="card cat-all cat-elec" id="card-voltage">
       <div class="label">Batería</div>
-      <div class="value-container">
-        <span class="value" id="voltage">--</span>
-        <span class="unit">V</span>
-      </div>
+      <div><span class="value" id="voltage">--</span> <span class="unit">V</span></div>
     </div>
 
   </div>
 
-  <footer>
-    Proyecto IoT - Visualización Remota via 4G
-  </footer>
-
   <script>
-    // --- CONFIGURACIÓN ---
+    // --- MQTT SETUP ---
     const broker = "broker.emqx.io";
     const port = 8084;
     const topic = "coches/raspi1/telemetria";
-    const clientID = "web_" + Math.random().toString(16).substr(2, 8);
+    const clientID = "rally_dash_" + Math.random().toString(16).substr(2, 8);
 
-    const statusPill = document.getElementById("connection-pill");
-    const tempCard = document.getElementById("card-temp");
-    const fuelCard = document.getElementById("card-fuel"); // Referencia a Fuel
-
-    function setStatus(state, msg) {
-      statusPill.innerText = msg;
-      statusPill.className = "";
-      if (state === "ok") statusPill.classList.add("status-active");
-      if (state === "error") statusPill.classList.add("status-error");
-    }
-
-    function updateVal(id, val) {
-      const el = document.getElementById(id);
-      if (el && val !== undefined) {
-        el.innerText = val;
-      }
-    }
-
-    // --- LÓGICA DE COLORES: TEMPERATURA ---
-    function updateTempColor(val) {
-      tempCard.classList.remove('state-warning', 'state-success', 'state-danger');
-      if (val === undefined || val === null) return;
-
-      if (val < 40) {
-        tempCard.classList.add('state-warning'); // Amarillo
-      } else if (val <= 95) {
-        tempCard.classList.add('state-success'); // Verde
-      } else {
-        tempCard.classList.add('state-danger');  // Rojo
-      }
-    }
-
-    // --- LÓGICA DE COLORES: GASOLINA ---
-    function updateFuelColor(val) {
-      fuelCard.classList.remove('state-warning', 'state-success', 'state-danger');
-      if (val === undefined || val === null) return;
-
-      if (val < 20) {
-        fuelCard.classList.add('state-danger');  // Rojo (Reserva)
-      } else {
-        fuelCard.classList.add('state-success'); // Verde (Ok)
-      }
-    }
-
-    // --- MQTT ---
     const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
 
-    client.onConnectionLost = (resp) => {
-      console.log("Perdido:", resp.errorMessage);
-      setStatus("error", "Desconectado");
+    // --- ELEMENTOS UI ---
+    const cards = {
+      speed: document.getElementById("speed"),
+      rpm: document.getElementById("rpm"),
+      temp: document.getElementById("temp"),
+      oil: document.getElementById("oil"),
+      map: document.getElementById("map"),
+      iat: document.getElementById("iat"),
+      load: document.getElementById("load"),
+      throttle: document.getElementById("throttle"),
+      lambda: document.getElementById("lambda"),
+      timing: document.getElementById("timing"),
+      fuel: document.getElementById("fuel"),
+      voltage: document.getElementById("voltage")
     };
 
+    // --- LOGICA DE COLORES ---
+    function updateColors(data) {
+      // AGUA (Amarillo < 40, Verde ok, Rojo > 95)
+      setColor("card-temp", data.temp, 40, 95);
+      
+      // ACEITE (Amarillo < 50, Verde ok, Rojo > 120)
+      setColor("card-oil", data.oil, 50, 120);
+
+      // FUEL (Rojo < 20, Verde ok)
+      const elFuel = document.getElementById("card-fuel");
+      elFuel.classList.remove('state-danger', 'state-success');
+      if(data.fuel < 20) elFuel.classList.add('state-danger');
+      else elFuel.classList.add('state-success');
+    }
+
+    function setColor(cardId, val, minOk, maxOk) {
+      const el = document.getElementById(cardId);
+      el.classList.remove('state-warning', 'state-success', 'state-danger');
+      if(val == 0 || val == undefined) return;
+
+      if(val < minOk) el.classList.add('state-warning');
+      else if (val > maxOk) el.classList.add('state-danger');
+      else el.classList.add('state-success');
+    }
+
+    // --- FILTRADO DE PESTAÑAS ---
+    function filterCategory(cat) {
+      // 1. Gestionar botones activos
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      // 2. Filtrar tarjetas
+      const allCards = document.querySelectorAll('.card');
+      allCards.forEach(card => {
+        if (cat === 'all') {
+            // Mostrar si tiene la clase cat-all
+            if(card.classList.contains('cat-all')) card.classList.remove('hidden');
+            else card.classList.add('hidden');
+        } else {
+            // Mostrar si tiene la clase especifica
+            if(card.classList.contains('cat-' + cat)) card.classList.remove('hidden');
+            else card.classList.add('hidden');
+        }
+      });
+    }
+
+    // --- RECEPCION MQTT ---
     client.onMessageArrived = (msg) => {
       try {
         const data = JSON.parse(msg.payloadString);
         
-        statusPill.style.opacity = 0.5;
-        setTimeout(() => statusPill.style.opacity = 1, 100);
+        // Actualizar Textos
+        for (const [key, el] of Object.entries(cards)) {
+            if(data[key] !== undefined) el.innerText = data[key];
+        }
+        
+        // Actualizar Colores
+        updateColors(data);
 
-        updateVal("rpm", data.rpm);
-        updateVal("speed", data.speed);
-        updateVal("temp", data.temp);
-        updateVal("throttle", data.throttle);
-        updateVal("fuel", data.fuel);
-        updateVal("load", data.load);
-        updateVal("voltage", data.voltage);
-
-        // Actualizamos los colores
-        updateTempColor(data.temp);
-        updateFuelColor(data.fuel);
-
-      } catch (e) {
-        console.error("Error JSON:", e);
-      }
+      } catch (e) { console.error(e); }
     };
-
-    // --- CONEXIÓN ---
-    console.log("Conectando...");
-    setStatus("wait", "Conectando a la nube...");
 
     client.connect({
       useSSL: true,
       onSuccess: () => {
-        console.log("Conectado!");
-        setStatus("ok", "● En Línea - Recibiendo datos");
+        console.log("Conectado");
         client.subscribe(topic);
-      },
-      onFailure: (e) => {
-        console.log("Fallo:", e.errorMessage);
-        setStatus("error", "Error de conexión");
       }
     });
   </script>
