@@ -89,7 +89,7 @@
       align-items: center;
     }
 
-    .hidden { display: none; }
+    .hidden { display: none !important; }
 
     .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: #64748b; opacity: 0.7; }
     .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 5px; }
@@ -106,15 +106,33 @@
     .state-danger { border-color: var(--danger) !important; animation: pulse 1s infinite; } .state-danger .value { color: var(--danger); } .state-danger::before { background: var(--danger); }
     @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
 
-    /* CONTENEDOR GRAFICO */
-    .chart-container {
+    /* CONTENEDOR GRAFICOS */
+    #graph-view {
       width: 100%;
       max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .chart-container {
+      width: 100%;
       background: var(--card-bg);
       padding: 10px;
       border-radius: 12px;
       border: 1px solid #334155;
-      height: 300px;
+      height: 250px; /* Altura fija para cada gráfico */
+      position: relative;
+    }
+    
+    .chart-title {
+      position: absolute;
+      top: 10px;
+      left: 15px;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      font-weight: 700;
     }
   </style>
 </head>
@@ -129,67 +147,62 @@
     <button class="nav-btn" onclick="filterCategory('elec')">ELEC/FUEL</button>
   </div>
 
-  <div id="graph-view" class="chart-container hidden">
-    <canvas id="telemetryChart"></canvas>
+  <div id="graph-view" class="hidden">
+    <div class="chart-container">
+      <div class="chart-title">Rendimiento (Velocidad / RPM)</div>
+      <canvas id="perfChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="chart-title">Salud Térmica (Agua / Aceite)</div>
+      <canvas id="tempChart"></canvas>
+    </div>
   </div>
 
   <div id="cards-view" class="dashboard-grid">
-    
     <div class="card highlight cat-all cat-motor cat-aire cat-elec cat-user" id="card-speed">
       <div class="label">Velocidad</div>
       <div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div>
     </div>
-
     <div class="card cat-all cat-motor" id="card-rpm">
       <div class="label">RPM</div>
       <div><span class="value" id="rpm">--</span></div>
     </div>
-
     <div class="card cat-all cat-motor cat-user" id="card-temp">
       <div class="label">Agua</div>
       <div><span class="value" id="temp">--</span> <span class="unit">°C</span></div>
     </div>
-
     <div class="card cat-all cat-motor cat-user" id="card-oil">
       <div class="label">Aceite</div>
       <div><span class="value" id="oil">--</span> <span class="unit">°C</span></div>
     </div>
-
     <div class="card cat-all cat-aire" id="card-map">
       <div class="label">Turbo (MAP)</div>
       <div><span class="value" id="map">--</span> <span class="unit">kPa</span></div>
     </div>
-
     <div class="card cat-all cat-aire" id="card-iat">
       <div class="label">Aire Adm.</div>
       <div><span class="value" id="iat">--</span> <span class="unit">°C</span></div>
     </div>
-
     <div class="card cat-all cat-motor" id="card-load">
       <div class="label">Carga</div>
       <div><span class="value" id="load">--</span> <span class="unit">%</span></div>
     </div>
-
     <div class="card cat-all cat-aire" id="card-throttle">
       <div class="label">Pedal</div>
       <div><span class="value" id="throttle">--</span> <span class="unit">%</span></div>
     </div>
-
     <div class="card cat-all cat-aire" id="card-lambda">
       <div class="label">Lambda</div>
       <div><span class="value" id="lambda">--</span> <span class="unit">λ</span></div>
     </div>
-
     <div class="card cat-motor" id="card-timing">
       <div class="label">Avance</div>
       <div><span class="value" id="timing">--</span> <span class="unit">°</span></div>
     </div>
-
     <div class="card cat-all cat-elec cat-user" id="card-fuel">
       <div class="label">Fuel</div>
       <div><span class="value" id="fuel">--</span> <span class="unit">%</span></div>
     </div>
-
     <div class="card cat-all cat-elec cat-user" id="card-voltage">
       <div class="label">Batería</div>
       <div><span class="value" id="voltage">--</span> <span class="unit">V</span></div>
@@ -197,7 +210,6 @@
   </div>
 
   <script>
-    // --- MQTT ---
     const broker = "broker.emqx.io";
     const port = 8084;
     const topic = "coches/raspi1/telemetria";
@@ -219,57 +231,45 @@
       voltage: document.getElementById("voltage")
     };
 
-    // --- CHART.JS SETUP ---
-    const ctx = document.getElementById('telemetryChart').getContext('2d');
-    const chart = new Chart(ctx, {
+    // --- CHART 1: RENDIMIENTO (Speed/RPM) ---
+    const ctx1 = document.getElementById('perfChart').getContext('2d');
+    const perfChart = new Chart(ctx1, {
       type: 'line',
       data: {
-        labels: [], // Tiempo
+        labels: [],
         datasets: [
-          {
-            label: 'Velocidad (km/h)',
-            data: [],
-            borderColor: '#3b82f6', // Azul
-            borderWidth: 2,
-            yAxisID: 'y',
-            tension: 0.4
-          },
-          {
-            label: 'RPM',
-            data: [],
-            borderColor: '#f59e0b', // Naranja
-            borderWidth: 2,
-            yAxisID: 'y1',
-            tension: 0.4
-          }
+          { label: 'Velocidad', data: [], borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y', pointRadius: 0, tension: 0.3 },
+          { label: 'RPM', data: [], borderColor: '#f59e0b', borderWidth: 2, yAxisID: 'y1', pointRadius: 0, tension: 0.3 }
         ]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false, // Desactivar animación para rendimiento real-time
-        plugins: {
-          legend: { labels: { color: '#cbd5e1' } }
-        },
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { labels: { color: '#94a3b8', font: {size: 10} } } },
         scales: {
-          x: { 
-            ticks: { color: '#64748b', maxTicksLimit: 6 },
-            grid: { color: '#334155' } 
-          },
-          y: {
-            type: 'linear',
-            display: true,
-            position: 'left',
-            ticks: { color: '#3b82f6' },
-            grid: { color: '#334155' }
-          },
-          y1: {
-            type: 'linear',
-            display: true,
-            position: 'right',
-            ticks: { color: '#f59e0b' },
-            grid: { drawOnChartArea: false } // Para no ensuciar el grid
-          }
+          x: { ticks: { display: false }, grid: { color: '#334155' } },
+          y: { type: 'linear', position: 'left', ticks: { color: '#3b82f6' }, grid: { color: '#334155' } },
+          y1: { type: 'linear', display: true, position: 'right', ticks: { color: '#f59e0b', callback: function(value) { return value/1000 + 'k'; } }, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+
+    // --- CHART 2: TEMPERATURAS (Agua/Aceite) ---
+    const ctx2 = document.getElementById('tempChart').getContext('2d');
+    const tempChart = new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'Agua (°C)', data: [], borderColor: '#22d3ee', borderWidth: 2, pointRadius: 0, tension: 0.4 }, // Cian
+          { label: 'Aceite (°C)', data: [], borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, tension: 0.4 } // Rojo
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { labels: { color: '#94a3b8', font: {size: 10} } } },
+        scales: {
+          x: { ticks: { display: false }, grid: { color: '#334155' } },
+          y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' }, suggestedMin: 60, suggestedMax: 120 }
         }
       }
     });
@@ -296,23 +296,34 @@
       } else el.classList.add('state-danger');
     }
 
-    // --- ACTUALIZAR GRAFICO ---
-    function updateChart(data) {
+    // --- ACTUALIZAR GRAFICOS ---
+    function updateCharts(data) {
         const now = new Date();
-        const timeStr = now.getHours() + ":" + now.getMinutes() + ":" + now.getSeconds();
+        const timeStr = now.getSeconds(); // Solo referencia interna
 
-        // Añadir datos
-        chart.data.labels.push(timeStr);
-        chart.data.datasets[0].data.push(data.speed);
-        chart.data.datasets[1].data.push(data.rpm);
+        // 1. Gráfico Rendimiento
+        perfChart.data.labels.push(timeStr);
+        perfChart.data.datasets[0].data.push(data.speed);
+        perfChart.data.datasets[1].data.push(data.rpm);
 
-        // Limitar a los últimos 20 puntos (aprox 20-30 segs)
-        if (chart.data.labels.length > 20) {
-            chart.data.labels.shift();
-            chart.data.datasets[0].data.shift();
-            chart.data.datasets[1].data.shift();
+        // 2. Gráfico Temperaturas
+        tempChart.data.labels.push(timeStr);
+        tempChart.data.datasets[0].data.push(data.temp);
+        tempChart.data.datasets[1].data.push(data.oil);
+
+        // LIMITE DE 60 PUNTOS (aprox 60 segundos si el envío es cada 1s)
+        if (perfChart.data.labels.length > 60) {
+            perfChart.data.labels.shift();
+            perfChart.data.datasets[0].data.shift();
+            perfChart.data.datasets[1].data.shift();
+            
+            tempChart.data.labels.shift();
+            tempChart.data.datasets[0].data.shift();
+            tempChart.data.datasets[1].data.shift();
         }
-        chart.update();
+        
+        perfChart.update();
+        tempChart.update();
     }
 
     // --- FILTRADO TABS ---
@@ -342,18 +353,16 @@
       }
     }
 
-    // Inicializar en USUARIO
     window.onload = function() { document.querySelector('.nav-btn').click(); };
 
     client.onMessageArrived = (msg) => {
       try {
         const data = JSON.parse(msg.payloadString);
-        // Actualizar valores numéricos
         for (const [key, el] of Object.entries(cards)) {
             if(data[key] !== undefined) el.innerText = data[key];
         }
         updateColors(data);
-        updateChart(data); // <-- Aqui se actualiza la grafica
+        updateCharts(data);
       } catch (e) { console.error(e); }
     };
 
