@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoMdUfW4E1kP/d+v8Lg/dK0pQ5g5O3p5K5S5B5C=" crossorigin=""/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoMdUfW4E1kP/d+v8Lg/dK0pQ5g5S5B5C=" crossorigin=""/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-2eHHGbbnOV3pDfoIBf/lSdoLz9KGGbuLcwngh7lyxM=" crossorigin=""></script>
 
   <style>
@@ -64,7 +64,8 @@
   <div class="nav-tabs">
     <button class="nav-btn active" onclick="filterCategory('user')">PRINCIPAL</button>
     <button class="nav-btn" onclick="filterCategory('graph')">HISTÓRICO</button>
-    <button class="nav-btn" onclick="filterCategory('location')">LOCALIZACIÓN</button> <button class="nav-btn" onclick="filterCategory('all')">TÉCNICO (TODO)</button>
+    <button class="nav-btn" onclick="filterCategory('location')">LOCALIZACIÓN</button> 
+    <button class="nav-btn" onclick="filterCategory('all')">TÉCNICO (TODO)</button>
     <button class="nav-btn" onclick="filterCategory('motor')">MOTOR</button>
     <button class="nav-btn" onclick="filterCategory('elec')">SISTEMAS</button>
   </div>
@@ -139,7 +140,6 @@
 
     function initMap() {
       if (mymap !== null) mymap.remove();
-      // Usar coordenadas de Madrid como centro inicial si no hay datos
       mymap = L.map('mapid').setView([40.4168, -3.7038], 13);
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -161,12 +161,10 @@
         marker.setLatLng(newLatLng);
         marker.setPopupContent(`Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}<br>Satélites: ${sats}`).openPopup();
       }
-      // Sólo centrar y hacer zoom si estamos en la pestaña de localización
       if (!document.getElementById('location-view').classList.contains('hidden')) {
            mymap.setView(newLatLng, 16); 
       }
       
-      // Actualizar los datos de la tarjeta de info de localización
       mapCoords.lat.innerText = lat.toFixed(6);
       mapCoords.lon.innerText = lon.toFixed(6);
       mapCoords.sats.innerText = sats;
@@ -185,10 +183,27 @@
       if (val >= minOk && val <= maxOk) el.classList.add('state-success');
       else if (val < minOk) { if (cardId === 'card-voltage' && val < 11.5) el.classList.add('state-danger'); else el.classList.add('state-warning'); } else el.classList.add('state-danger');
     }
+    
+    // Función central: Se encarga de dibujar la gráfica
     function updateCharts(data) {
         const timeStr = new Date().getSeconds();
-        perfChart.data.labels.push(timeStr); perfChart.data.datasets[0].data.push(data.speed); perfChart.data.datasets[1].data.push(data.rpm);
-        tempChart.data.labels.push(timeStr); tempChart.data.datasets[0].data.push(data.temp); tempChart.data.datasets[1].data.push(data.oil);
+        
+        // FIX CLAVE: IGNORAR 0s para Temperaturas para evitar caídas
+        const speedVal = data.speed;
+        const rpmVal = data.rpm;
+        
+        // Si Temp o Aceite son 0, probablemente es un fallo de lectura, dibujamos NaN (salto).
+        const tempVal = data.temp > 0 ? data.temp : NaN;
+        const oilVal = data.oil > 0 ? data.oil : NaN;
+
+        perfChart.data.labels.push(timeStr); 
+        perfChart.data.datasets[0].data.push(speedVal); 
+        perfChart.data.datasets[1].data.push(rpmVal);
+        
+        tempChart.data.labels.push(timeStr); 
+        tempChart.data.datasets[0].data.push(tempVal); 
+        tempChart.data.datasets[1].data.push(oilVal);
+        
         if (perfChart.data.labels.length > 60) { perfChart.data.labels.shift(); perfChart.data.datasets[0].data.shift(); perfChart.data.datasets[1].data.shift(); tempChart.data.labels.shift(); tempChart.data.datasets[0].data.shift(); tempChart.data.datasets[1].data.shift(); }
         perfChart.update(); tempChart.update();
     }
@@ -208,7 +223,7 @@
         views.location.classList.remove('hidden');
         if (mymap === null) initMap();
         
-        // FIX CLAVE para que Leaflet calcule el tamaño correctamente después de mostrar el contenedor:
+        // FIX CLAVE: Invalidar tamaño después de mostrar el contenedor.
         setTimeout(() => { if (mymap) mymap.invalidateSize(); }, 50); 
         
       } else { 
