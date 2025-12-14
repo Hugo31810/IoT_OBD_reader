@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;500;700&display=swap" rel="stylesheet">
-  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 
   <style>
@@ -15,10 +14,10 @@
       --bg-color: #0f172a;       /* Azul muy oscuro */
       --card-bg: #1e293b;        /* Azul grisáceo */
       --text-main: #f8fafc;      /* Blanco roto */
-      --accent: #10b981;         /* Verde esmeralda (Simyo/Conectado) */
+      --accent: #10b981;         /* Verde esmeralda (Ok) */
       --accent-dim: rgba(16, 185, 129, 0.1);
-      --danger: #ef4444;         /* Rojo error */
-      --warning: #f59e0b;        /* Naranja espera */
+      --danger: #ef4444;         /* Rojo (Peligro/Reserva) */
+      --warning: #f59e0b;        /* Amarillo (Frío/Aviso) */
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -57,7 +56,6 @@
       color: #94a3b8;
     }
 
-    /* --- ESTADO DE CONEXIÓN --- */
     #connection-pill {
       display: inline-block;
       padding: 6px 16px;
@@ -73,16 +71,16 @@
     .status-active { background: var(--accent-dim) !important; color: var(--accent) !important; border: 1px solid var(--accent); }
     .status-error { background: rgba(239, 68, 68, 0.1) !important; color: var(--danger) !important; border: 1px solid var(--danger); }
 
-    /* --- GRID DE DATOS --- */
+    /* --- GRID --- */
     .dashboard-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr); /* 2 columnas */
+      grid-template-columns: repeat(2, 1fr);
       gap: 15px;
       width: 100%;
       max-width: 600px;
     }
 
-    /* --- TARJETAS (CARDS) --- */
+    /* --- TARJETAS --- */
     .card {
       background: var(--card-bg);
       border-radius: 16px;
@@ -92,9 +90,9 @@
       border: 1px solid #334155;
       position: relative;
       overflow: hidden;
+      transition: all 0.3s ease;
     }
 
-    /* Efecto decorativo barra superior en cada tarjeta */
     .card::before {
       content: '';
       position: absolute;
@@ -131,15 +129,47 @@
       font-weight: 400;
     }
 
-    /* --- TARJETA GRANDE (VELOCIDAD) --- */
+    /* Tarjeta Velocidad Grande */
     .card.highlight {
-      grid-column: span 2; /* Ocupa todo el ancho */
+      grid-column: span 2; 
       background: linear-gradient(145deg, #1e293b, #0f172a);
       border-color: var(--accent);
     }
     .highlight .value { color: var(--accent); font-size: 3.5rem; }
 
-    /* --- PIE DE PÁGINA --- */
+    /* --- ESTADOS DE COLOR (GLOBALES) --- */
+    
+    /* Amarillo (Warning / Frío) */
+    .card.state-warning {
+      border-color: var(--warning) !important;
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.1);
+    }
+    .card.state-warning .value { color: var(--warning); }
+    .card.state-warning::before { background: var(--warning); }
+
+    /* Verde (Success / Normal) */
+    .card.state-success {
+      border-color: var(--accent) !important;
+    }
+    .card.state-success .value { color: var(--accent); }
+    .card.state-success::before { background: var(--accent); }
+
+    /* Rojo (Danger / Caliente / Reserva) */
+    .card.state-danger {
+      border-color: var(--danger) !important;
+      background: rgba(239, 68, 68, 0.05);
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+      animation: pulse-danger 1s infinite;
+    }
+    .card.state-danger .value { color: var(--danger); }
+    .card.state-danger::before { background: var(--danger); }
+
+    @keyframes pulse-danger {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+
     footer {
       margin-top: 40px;
       font-size: 0.7rem;
@@ -174,7 +204,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="card-temp">
       <div class="label">Temp</div>
       <div class="value-container">
         <span class="value" id="temp">--</span>
@@ -197,7 +227,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="card-fuel">
       <div class="label">Fuel</div>
       <div class="value-container">
         <span class="value" id="fuel">--</span>
@@ -227,11 +257,12 @@
     const clientID = "web_" + Math.random().toString(16).substr(2, 8);
 
     const statusPill = document.getElementById("connection-pill");
+    const tempCard = document.getElementById("card-temp");
+    const fuelCard = document.getElementById("card-fuel"); // Referencia a Fuel
 
-    // --- FUNCIONES UI ---
     function setStatus(state, msg) {
       statusPill.innerText = msg;
-      statusPill.className = ""; // Reset clases
+      statusPill.className = "";
       if (state === "ok") statusPill.classList.add("status-active");
       if (state === "error") statusPill.classList.add("status-error");
     }
@@ -240,6 +271,32 @@
       const el = document.getElementById(id);
       if (el && val !== undefined) {
         el.innerText = val;
+      }
+    }
+
+    // --- LÓGICA DE COLORES: TEMPERATURA ---
+    function updateTempColor(val) {
+      tempCard.classList.remove('state-warning', 'state-success', 'state-danger');
+      if (val === undefined || val === null) return;
+
+      if (val < 40) {
+        tempCard.classList.add('state-warning'); // Amarillo
+      } else if (val <= 95) {
+        tempCard.classList.add('state-success'); // Verde
+      } else {
+        tempCard.classList.add('state-danger');  // Rojo
+      }
+    }
+
+    // --- LÓGICA DE COLORES: GASOLINA ---
+    function updateFuelColor(val) {
+      fuelCard.classList.remove('state-warning', 'state-success', 'state-danger');
+      if (val === undefined || val === null) return;
+
+      if (val < 20) {
+        fuelCard.classList.add('state-danger');  // Rojo (Reserva)
+      } else {
+        fuelCard.classList.add('state-success'); // Verde (Ok)
       }
     }
 
@@ -255,7 +312,6 @@
       try {
         const data = JSON.parse(msg.payloadString);
         
-        // Efecto visual: Parpadeo sutil del indicador verde al recibir datos
         statusPill.style.opacity = 0.5;
         setTimeout(() => statusPill.style.opacity = 1, 100);
 
@@ -264,8 +320,12 @@
         updateVal("temp", data.temp);
         updateVal("throttle", data.throttle);
         updateVal("fuel", data.fuel);
-        updateVal("load", data.load); // Asegúrate de que tu Python envía "load"
+        updateVal("load", data.load);
         updateVal("voltage", data.voltage);
+
+        // Actualizamos los colores
+        updateTempColor(data.temp);
+        updateFuelColor(data.fuel);
 
       } catch (e) {
         console.error("Error JSON:", e);
