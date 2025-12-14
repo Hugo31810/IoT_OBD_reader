@@ -2,362 +2,253 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Rally Telemetry Pro</title>
+  <title>Monitor de Vehiculo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     :root {
-      --bg-color: #0f172a;
-      --card-bg: #1e293b;
-      --text-main: #f8fafc;
-      --accent: #10b981;
-      --danger: #ef4444;
-      --warning: #f59e0b;
-      --info: #3b82f6;
+      --bg-color: #0f172a; --card-bg: #1e293b; --text-main: #f8fafc;
+      --accent: #10b981; --danger: #ef4444; --warning: #f59e0b; --info: #3b82f6;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      font-family: 'Roboto', sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      padding: 10px;
+      background-color: var(--bg-color); color: var(--text-main); font-family: 'Roboto', sans-serif;
+      display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 15px;
     }
 
-    /* TABS */
+    /* ALERTA COMBUSTIBLE */
+    #fuel-alert {
+      position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%);
+      background-color: rgba(220, 38, 38, 0.95); color: white; padding: 25px 50px;
+      border-radius: 12px; border: 2px solid #fca5a5; text-align: center;
+      z-index: 9999; box-shadow: 0 0 60px rgba(0,0,0,0.8); display: none;
+      animation: alert-blink 0.8s infinite alternate;
+    }
+    .alert-icon { font-size: 3rem; display: block; margin-bottom: 10px; }
+    .alert-title { font-size: 1.5rem; font-weight: 700; text-transform: uppercase; display: block; }
+    @keyframes alert-blink { 0% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.02); } }
+
+    /* NAVEGACIÓN */
     .nav-tabs {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-      background: #1e293b;
-      padding: 5px;
-      border-radius: 10px;
-      width: 100%;
-      max-width: 600px;
-      overflow-x: auto;
+      display: flex; gap: 8px; margin-bottom: 20px; background: #1e293b; padding: 6px;
+      border-radius: 12px; width: 100%; max-width: 600px; overflow-x: auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
-
     .nav-btn {
-      flex: 1;
-      padding: 10px;
-      background: transparent;
-      border: none;
-      color: #94a3b8;
-      font-weight: 700;
-      cursor: pointer;
-      border-radius: 8px;
-      transition: all 0.3s;
-      white-space: nowrap;
+      flex: 1; padding: 10px 15px; background: transparent; border: none; color: #94a3b8;
+      font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s; white-space: nowrap;
     }
+    .nav-btn.active { background: var(--info); color: white; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); }
 
-    .nav-btn.active {
-      background: var(--info);
-      color: white;
-      box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
-    }
-
-    /* GRID */
+    /* CONTENEDORES PRINCIPALES */
     .dashboard-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      width: 100%;
-      max-width: 600px;
-      margin-bottom: 20px;
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 600px; margin-bottom: 20px;
     }
+    #graph-view {
+      width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 15px;
+    }
+    .hidden { display: none !important; }
 
     /* TARJETAS */
     .card {
-      background: var(--card-bg);
-      border-radius: 12px;
-      padding: 15px;
-      text-align: center;
-      border: 1px solid #334155;
-      position: relative;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      background: var(--card-bg); border-radius: 12px; padding: 15px; text-align: center;
+      border: 1px solid #334155; position: relative; overflow: hidden; display: flex;
+      flex-direction: column; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
-
-    .hidden { display: none; }
-
-    .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: #64748b; opacity: 0.7; }
-    .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 5px; }
-    .value { font-size: 2rem; font-weight: 700; color: var(--text-main); }
-    .unit { font-size: 0.8rem; color: #64748b; }
-
+    .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: #64748b; opacity: 0.5; }
+    .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 8px; font-weight: 500; }
+    .value { font-size: 2.2rem; font-weight: 700; color: var(--text-main); }
+    .unit { font-size: 0.9rem; color: #64748b; margin-left: 2px; }
     .card.highlight { grid-column: span 2; background: linear-gradient(145deg, #1e293b, #0f172a); border-color: var(--info); }
-    .highlight .value { font-size: 3rem; color: var(--info); }
-    .highlight::before { background: var(--info); }
-
-    /* ESTADOS */
-    .state-warning { border-color: var(--warning) !important; } .state-warning .value { color: var(--warning); } .state-warning::before { background: var(--warning); }
-    .state-success { border-color: var(--accent) !important; } .state-success .value { color: var(--accent); } .state-success::before { background: var(--accent); }
-    .state-danger { border-color: var(--danger) !important; animation: pulse 1s infinite; } .state-danger .value { color: var(--danger); } .state-danger::before { background: var(--danger); }
-    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
-
-    /* CONTENEDOR GRAFICO */
+    .highlight .value { font-size: 3.5rem; color: var(--info); } .highlight::before { background: var(--info); opacity: 1; }
+    
+    /* GRÁFICOS */
     .chart-container {
-      width: 100%;
-      max-width: 600px;
-      background: var(--card-bg);
-      padding: 10px;
-      border-radius: 12px;
-      border: 1px solid #334155;
-      height: 300px;
+      width: 100%; background: var(--card-bg); padding: 15px; border-radius: 12px;
+      border: 1px solid #334155; height: 260px; position: relative;
+    }
+    .chart-header {
+      font-size: 0.8rem; color: #94a3b8; text-transform: uppercase;
+      font-weight: 700; margin-bottom: 10px; text-align: left;
     }
   </style>
 </head>
 <body>
 
-  <div class="nav-tabs">
-    <button class="nav-btn active" onclick="filterCategory('user')">USUARIO</button>
-    <button class="nav-btn" onclick="filterCategory('graph')">GRÁFICAS</button>
-    <button class="nav-btn" onclick="filterCategory('all')">TODO</button>
-    <button class="nav-btn" onclick="filterCategory('motor')">MOTOR</button>
-    <button class="nav-btn" onclick="filterCategory('aire')">AIRE/TURBO</button>
-    <button class="nav-btn" onclick="filterCategory('elec')">ELEC/FUEL</button>
+  <div id="fuel-alert">
+    <span class="alert-icon">⛽</span>
+    <span class="alert-title">Reserva</span>
+    <span class="alert-desc">Nivel de combustible bajo</span>
   </div>
 
-  <div id="graph-view" class="chart-container hidden">
-    <canvas id="telemetryChart"></canvas>
+  <div class="nav-tabs">
+    <button class="nav-btn active" onclick="filterCategory('user')">PRINCIPAL</button>
+    <button class="nav-btn" onclick="filterCategory('graph')">HISTÓRICO</button>
+    <button class="nav-btn" onclick="filterCategory('all')">TÉCNICO (TODO)</button>
+    <button class="nav-btn" onclick="filterCategory('motor')">MOTOR</button>
+    <button class="nav-btn" onclick="filterCategory('elec')">SISTEMAS</button>
   </div>
 
   <div id="cards-view" class="dashboard-grid">
     
-    <div class="card highlight cat-all cat-motor cat-aire cat-elec cat-user" id="card-speed">
-      <div class="label">Velocidad</div>
-      <div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div>
-    </div>
+    <div class="card highlight cat-all cat-motor cat-elec cat-user" id="card-speed"><div class="label">Velocidad</div><div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div></div>
+    
+    <div class="card cat-all cat-motor cat-user" id="card-temp"><div class="label">Temp. Agua</div><div><span class="value" id="temp">--</span> <span class="unit">°C</span></div></div>
+    <div class="card cat-all cat-motor cat-user" id="card-oil"><div class="label">Temp. Aceite</div><div><span class="value" id="oil">--</span> <span class="unit">°C</span></div></div>
+    <div class="card cat-all cat-elec cat-user" id="card-fuel"><div class="label">Combustible</div><div><span class="value" id="fuel">--</span> <span class="unit">%</span></div></div>
+    <div class="card cat-all cat-elec cat-user" id="card-voltage"><div class="label">Batería</div><div><span class="value" id="voltage">--</span> <span class="unit">V</span></div></div>
 
-    <div class="card cat-all cat-motor" id="card-rpm">
-      <div class="label">RPM</div>
-      <div><span class="value" id="rpm">--</span></div>
-    </div>
+    <div class="card cat-all cat-motor" id="card-rpm"><div class="label">RPM</div><div><span class="value" id="rpm">--</span></div></div>
+    <div class="card cat-all cat-motor" id="card-map"><div class="label">Presion MAP</div><div><span class="value" id="map">--</span> <span class="unit">kPa</span></div></div>
+    <div class="card cat-all cat-motor" id="card-load"><div class="label">Carga Motor</div><div><span class="value" id="load">--</span> <span class="unit">%</span></div></div>
+    <div class="card cat-all cat-motor" id="card-throttle"><div class="label">Acelerador</div><div><span class="value" id="throttle">--</span> <span class="unit">%</span></div></div>
+    <div class="card cat-all cat-motor" id="card-iat"><div class="label">Temp. Admision</div><div><span class="value" id="iat">--</span> <span class="unit">°C</span></div></div>
+    <div class="card cat-all cat-motor" id="card-lambda"><div class="label">Mezcla (lambda)</div><div><span class="value" id="lambda">--</span> <span class="unit"></span></div></div>
+    <div class="card cat-all cat-motor" id="card-timing"><div class="label">Avance</div><div><span class="value" id="timing">--</span> <span class="unit">°</span></div></div>
+  </div>
 
-    <div class="card cat-all cat-motor cat-user" id="card-temp">
-      <div class="label">Agua</div>
-      <div><span class="value" id="temp">--</span> <span class="unit">°C</span></div>
-    </div>
-
-    <div class="card cat-all cat-motor cat-user" id="card-oil">
-      <div class="label">Aceite</div>
-      <div><span class="value" id="oil">--</span> <span class="unit">°C</span></div>
-    </div>
-
-    <div class="card cat-all cat-aire" id="card-map">
-      <div class="label">Turbo (MAP)</div>
-      <div><span class="value" id="map">--</span> <span class="unit">kPa</span></div>
-    </div>
-
-    <div class="card cat-all cat-aire" id="card-iat">
-      <div class="label">Aire Adm.</div>
-      <div><span class="value" id="iat">--</span> <span class="unit">°C</span></div>
-    </div>
-
-    <div class="card cat-all cat-motor" id="card-load">
-      <div class="label">Carga</div>
-      <div><span class="value" id="load">--</span> <span class="unit">%</span></div>
-    </div>
-
-    <div class="card cat-all cat-aire" id="card-throttle">
-      <div class="label">Pedal</div>
-      <div><span class="value" id="throttle">--</span> <span class="unit">%</span></div>
-    </div>
-
-    <div class="card cat-all cat-aire" id="card-lambda">
-      <div class="label">Lambda</div>
-      <div><span class="value" id="lambda">--</span> <span class="unit">λ</span></div>
-    </div>
-
-    <div class="card cat-motor" id="card-timing">
-      <div class="label">Avance</div>
-      <div><span class="value" id="timing">--</span> <span class="unit">°</span></div>
-    </div>
-
-    <div class="card cat-all cat-elec cat-user" id="card-fuel">
-      <div class="label">Fuel</div>
-      <div><span class="value" id="fuel">--</span> <span class="unit">%</span></div>
-    </div>
-
-    <div class="card cat-all cat-elec cat-user" id="card-voltage">
-      <div class="label">Batería</div>
-      <div><span class="value" id="voltage">--</span> <span class="unit">V</span></div>
-    </div>
+  <div id="graph-view" class="hidden">
+    <div class="chart-container"><div class="chart-header">Velocidad / RPM (Ultimo minuto)</div><canvas id="perfChart"></canvas></div>
+    <div class="chart-container"><div class="chart-header">Temperatura Motor (Agua / Aceite)</div><canvas id="tempChart"></canvas></div>
   </div>
 
   <script>
-    // --- MQTT ---
-    const broker = "broker.emqx.io";
-    const port = 8084;
-    const topic = "coches/raspi1/telemetria";
-    const clientID = "rally_dash_" + Math.random().toString(16).substr(2, 8);
+    // --- CONFIGURACIÓN MQTT Y DOM ---
+    const broker = "broker.emqx.io"; const port = 8084; const topic = "coches/raspi1/telemetria";
+    const clientID = "fleet_stable_" + Math.random().toString(16).substr(2, 8);
     const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
 
-    const cards = {
-      speed: document.getElementById("speed"),
-      rpm: document.getElementById("rpm"),
-      temp: document.getElementById("temp"),
-      oil: document.getElementById("oil"),
-      map: document.getElementById("map"),
-      iat: document.getElementById("iat"),
-      load: document.getElementById("load"),
-      throttle: document.getElementById("throttle"),
-      lambda: document.getElementById("lambda"),
-      timing: document.getElementById("timing"),
-      fuel: document.getElementById("fuel"),
-      voltage: document.getElementById("voltage")
+    const cards = { 
+      speed: document.getElementById("speed"), rpm: document.getElementById("rpm"), temp: document.getElementById("temp"), oil: document.getElementById("oil"), 
+      map: document.getElementById("map"), load: document.getElementById("load"), fuel: document.getElementById("fuel"), voltage: document.getElementById("voltage"), 
+      throttle: document.getElementById("throttle"), iat: document.getElementById("iat"), lambda: document.getElementById("lambda"), timing: document.getElementById("timing")
+    };
+    
+    // Almacena el ultimo valor para persistencia en tarjetas
+    const lastDisplayedValues = { 
+        speed: 0, rpm: 0, temp: 0, oil: 0, map: 0, load: 0, fuel: 0, voltage: 0, 
+        throttle: 0, iat: 0, lambda: 0, timing: 0
     };
 
-    // --- CHART.JS SETUP ---
-    const ctx = document.getElementById('telemetryChart').getContext('2d');
-    const chart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: [], // Tiempo
-        datasets: [
-          {
-            label: 'Velocidad (km/h)',
-            data: [],
-            borderColor: '#3b82f6', // Azul
-            borderWidth: 2,
-            yAxisID: 'y',
-            tension: 0.4
-          },
-          {
-            label: 'RPM',
-            data: [],
-            borderColor: '#f59e0b', // Naranja
-            borderWidth: 2,
-            yAxisID: 'y1',
-            tension: 0.4
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false, // Desactivar animación para rendimiento real-time
-        plugins: {
-          legend: { labels: { color: '#cbd5e1' } }
-        },
-        scales: {
-          x: { 
-            ticks: { color: '#64748b', maxTicksLimit: 6 },
-            grid: { color: '#334155' } 
-          },
-          y: {
-            type: 'linear',
-            display: true,
-            position: 'left',
-            ticks: { color: '#3b82f6' },
-            grid: { color: '#334155' }
-          },
-          y1: {
-            type: 'linear',
-            display: true,
-            position: 'right',
-            ticks: { color: '#f59e0b' },
-            grid: { drawOnChartArea: false } // Para no ensuciar el grid
-          }
-        }
-      }
-    });
 
-    // --- COLORES ---
-    function updateColors(data) {
-      setColor("card-temp", data.temp, 40, 95);
-      setColor("card-oil", data.oil, 50, 120);
-      setColor("card-voltage", data.voltage, 12.0, 14.8);
-      const elFuel = document.getElementById("card-fuel");
-      elFuel.classList.remove('state-danger', 'state-success');
-      if(data.fuel < 20) elFuel.classList.add('state-danger');
-      else elFuel.classList.add('state-success');
+    // --- GRÁFICOS ---
+    const ctx1 = document.getElementById('perfChart').getContext('2d');
+    const perfChart = new Chart(ctx1, { type: 'line', data: { labels: [], datasets: [ { label: 'Velocidad', data: [], borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y', pointRadius: 0, tension: 0.3 }, { label: 'RPM', data: [], borderColor: '#f59e0b', borderWidth: 2, yAxisID: 'y1', pointRadius: 0, tension: 0.3 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { type: 'linear', position: 'left', ticks: { color: '#3b82f6' }, grid: { color: '#334155' } }, y1: { type: 'linear', display: true, position: 'right', ticks: { color: '#f59e0b', callback: v => v/1000 + 'k' }, grid: { drawOnChartArea: false } } } } });
+    const ctx2 = document.getElementById('tempChart').getContext('2d');
+    const tempChart = new Chart(ctx2, { type: 'line', data: { labels: [], datasets: [ { label: 'Agua', data: [], borderColor: '#22d3ee', borderWidth: 2, pointRadius: 0, tension: 0.4 }, { label: 'Aceite', data: [], borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, tension: 0.4 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' }, suggestedMin: 50, suggestedMax: 110 } } } });
+
+
+    // --- LÓGICA DE PERSISTENCIA Y ACTUALIZACIÓN ---
+
+    function updateDataAndState(data) {
+        let currentValues = {};
+        const updateAlwaysMetrics = ['speed', 'rpm', 'voltage', 'fuel']; 
+
+        for (const [key, el] of Object.entries(cards)) { 
+            const value = data[key];
+
+            if (value !== undefined) {
+                
+                if (updateAlwaysMetrics.includes(key)) {
+                    // Velocidad/RPM/Voltaje/Fuel: Actualizar siempre, incluso si es 0
+                    el.innerText = value;
+                    lastDisplayedValues[key] = value;
+                    currentValues[key] = value;
+                } else if (value > 0) {
+                    // Para Temp/Oil/MAP/etc.: Solo si es POSITIVO (> 0), lo actualizamos.
+                    el.innerText = value;
+                    lastDisplayedValues[key] = value;
+                    currentValues[key] = value;
+                } else {
+                    // Si es 0 o indefinido, usar el valor persistente para el display y la gráfica
+                    el.innerText = lastDisplayedValues[key] > 0 ? lastDisplayedValues[key] : "--";
+                    currentValues[key] = lastDisplayedValues[key]; 
+                }
+            } else {
+                // Si el dato no viene, usar el valor persistente
+                currentValues[key] = lastDisplayedValues[key];
+            }
+        }
+        
+        // Ejecutar lógicas de color y gráfica con los valores persistentes.
+        updateStatus(currentValues);
+        updateCharts(currentValues); 
     }
 
+    function updateStatus(data) {
+      setColor("card-temp", data.temp, 40, 100); setColor("card-oil", data.oil, 50, 120); setColor("card-voltage", data.voltage, 12.0, 14.8);
+      const elFuel = document.getElementById("card-fuel"); const alertBox = document.getElementById("fuel-alert");
+      elFuel.classList.remove('state-danger', 'state-success'); if (data.fuel < 15) elFuel.classList.add('state-danger'); else elFuel.classList.add('state-success');
+      if (data.fuel > 0 && data.fuel < 15) alertBox.style.display = "block"; else alertBox.style.display = "none";
+    }
     function setColor(cardId, val, minOk, maxOk) {
-      const el = document.getElementById(cardId);
-      el.classList.remove('state-warning', 'state-success', 'state-danger');
-      if(val == 0 || val == undefined) return;
+      const el = document.getElementById(cardId); el.classList.remove('state-warning', 'state-success', 'state-danger'); if(val == 0 || val == undefined) return;
       if (val >= minOk && val <= maxOk) el.classList.add('state-success');
-      else if (val < minOk) {
-         if (cardId === 'card-voltage' && val < 11.5) el.classList.add('state-danger');
-         else el.classList.add('state-warning'); 
-      } else el.classList.add('state-danger');
+      else if (val < minOk) { if (cardId === 'card-voltage' && val < 11.5) el.classList.add('state-danger'); else el.classList.add('state-warning'); } else el.classList.add('state-danger');
+    }
+    
+    // Función central: Se encarga de dibujar la gráfica
+    function updateCharts(data) {
+        const timeStr = new Date().getSeconds();
+        
+        const speedVal = data.speed;
+        const rpmVal = data.rpm;
+        
+        // Temperaturas: si el valor es 0, usamos NaN para que la línea no caiga.
+        const tempVal = data.temp > 0 ? data.temp : NaN; 
+        const oilVal = data.oil > 0 ? data.oil : NaN;
+
+        perfChart.data.labels.push(timeStr); 
+        perfChart.data.datasets[0].data.push(speedVal); 
+        perfChart.data.datasets[1].data.push(rpmVal);
+        
+        tempChart.data.labels.push(timeStr); 
+        tempChart.data.datasets[0].data.push(tempVal); 
+        tempChart.data.datasets[1].data.push(oilVal);
+        
+        if (perfChart.data.labels.length > 60) { perfChart.data.labels.shift(); perfChart.data.datasets[0].data.shift(); perfChart.data.datasets[1].data.shift(); tempChart.data.labels.shift(); tempChart.data.datasets[0].data.shift(); tempChart.data.datasets[1].data.shift(); }
+        perfChart.update(); tempChart.update();
     }
 
-    // --- ACTUALIZAR GRAFICO ---
-    function updateChart(data) {
-        const now = new Date();
-        const timeStr = now.getHours() + ":" + now.getMinutes() + ":" + now.getSeconds();
-
-        // Añadir datos
-        chart.data.labels.push(timeStr);
-        chart.data.datasets[0].data.push(data.speed);
-        chart.data.datasets[1].data.push(data.rpm);
-
-        // Limitar a los últimos 20 puntos (aprox 20-30 segs)
-        if (chart.data.labels.length > 20) {
-            chart.data.labels.shift();
-            chart.data.datasets[0].data.shift();
-            chart.data.datasets[1].data.shift();
-        }
-        chart.update();
-    }
-
-    // --- FILTRADO TABS ---
+    // --- GESTIÓN DE PESTAÑAS ---
     function filterCategory(cat) {
-      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); event.target.classList.add('active');
 
-      const graphView = document.getElementById('graph-view');
-      const cardsView = document.getElementById('cards-view');
+      const views = { cards: document.getElementById('cards-view'), graph: document.getElementById('graph-view') };
+
+      for (let key in views) views[key].classList.add('hidden');
 
       if (cat === 'graph') {
-        graphView.classList.remove('hidden');
-        cardsView.classList.add('hidden');
-      } else {
-        graphView.classList.add('hidden');
-        cardsView.classList.remove('hidden');
-        
-        const allCards = document.querySelectorAll('.card');
-        allCards.forEach(card => {
-            card.classList.add('hidden');
-            if (cat === 'all') {
-                if(card.classList.contains('cat-all')) card.classList.remove('hidden');
-            } else {
-                if(card.classList.contains('cat-' + cat)) card.classList.remove('hidden');
-            }
+        views.graph.classList.remove('hidden');
+        perfChart.resize(); tempChart.resize();
+      } else { 
+        views.cards.classList.remove('hidden');
+        document.querySelectorAll('.card').forEach(card => { 
+          card.classList.add('hidden'); 
+          if (cat === 'all') { if(card.classList.contains('cat-all')) card.classList.remove('hidden'); } 
+          else if (cat === 'user') { if(card.classList.contains('cat-user')) card.classList.remove('hidden'); }
+          else if (cat === 'motor') { if(card.classList.contains('cat-motor')) card.classList.remove('hidden'); }
+          else if (cat === 'elec') { if(card.classList.contains('cat-elec')) card.classList.remove('hidden'); }
         });
       }
     }
 
-    // Inicializar en USUARIO
-    window.onload = function() { document.querySelector('.nav-btn').click(); };
+    window.onload = function() { filterCategory('user', document.querySelector('.nav-btn.active')); };
 
-    client.onMessageArrived = (msg) => {
-      try {
+    // --- RECEPCIÓN MQTT ---
+    client.onMessageArrived = (msg) => { 
+      try { 
         const data = JSON.parse(msg.payloadString);
-        // Actualizar valores numéricos
-        for (const [key, el] of Object.entries(cards)) {
-            if(data[key] !== undefined) el.innerText = data[key];
-        }
-        updateColors(data);
-        updateChart(data); // <-- Aqui se actualiza la grafica
-      } catch (e) { console.error(e); }
+        updateDataAndState(data); // Llamada a la funcion de persistencia
+      } catch (e) { console.error(e); } 
     };
 
-    client.connect({ useSSL: true, onSuccess: () => { client.subscribe(topic); } });
+    client.connect({ useSSL: true, onSuccess: () => { console.log("Conectado"); client.subscribe(topic); }});
   </script>
 </body>
 </html>
