@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Monitor de Vehiculo</title>
+  <title>Monitor de Vehículo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -11,70 +11,169 @@
 
   <style>
     :root {
-      --bg-color: #0f172a; --card-bg: #1e293b; --text-main: #f8fafc;
-      --accent: #10b981; --danger: #ef4444; --warning: #f59e0b; --info: #3b82f6;
+      --bg-color: #0f172a;       /* Fondo oscuro profesional */
+      --card-bg: #1e293b;        /* Tarjetas */
+      --text-main: #f8fafc;      /* Texto claro */
+      --accent: #10b981;         /* Verde (Estado OK) */
+      --danger: #ef4444;         /* Rojo (Alerta/Crítico) */
+      --warning: #f59e0b;        /* Amarillo (Precaución) */
+      --info: #3b82f6;           /* Azul (Información/Velocidad) */
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background-color: var(--bg-color); color: var(--text-main); font-family: 'Roboto', sans-serif;
-      display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 15px;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Roboto', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 15px;
     }
 
-    /* ALERTA COMBUSTIBLE */
+    /* --- ALERTA DE COMBUSTIBLE (OVERLAY) --- */
     #fuel-alert {
-      position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%);
-      background-color: rgba(220, 38, 38, 0.95); color: white; padding: 25px 50px;
-      border-radius: 12px; border: 2px solid #fca5a5; text-align: center;
-      z-index: 9999; box-shadow: 0 0 60px rgba(0,0,0,0.8); display: none;
+      position: fixed;
+      top: 30%; 
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(220, 38, 38, 0.95);
+      color: white;
+      padding: 25px 50px;
+      border-radius: 12px;
+      border: 2px solid #fca5a5;
+      text-align: center;
+      z-index: 9999;
+      box-shadow: 0 0 60px rgba(0,0,0,0.8);
+      display: none; /* Oculto por defecto */
       animation: alert-blink 0.8s infinite alternate;
     }
+
     .alert-icon { font-size: 3rem; display: block; margin-bottom: 10px; }
     .alert-title { font-size: 1.5rem; font-weight: 700; text-transform: uppercase; display: block; }
-    @keyframes alert-blink { 0% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.02); } }
+    .alert-desc { font-size: 1rem; opacity: 0.9; }
 
-    /* NAVEGACIÓN */
+    @keyframes alert-blink {
+      0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.02); }
+    }
+
+    /* --- NAVEGACIÓN (PESTAÑAS) --- */
     .nav-tabs {
-      display: flex; gap: 8px; margin-bottom: 20px; background: #1e293b; padding: 6px;
-      border-radius: 12px; width: 100%; max-width: 600px; overflow-x: auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      background: #1e293b;
+      padding: 6px;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 600px;
+      overflow-x: auto;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
-    .nav-btn {
-      flex: 1; padding: 10px 15px; background: transparent; border: none; color: #94a3b8;
-      font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s; white-space: nowrap;
-    }
-    .nav-btn.active { background: var(--info); color: white; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); }
 
-    /* CONTENEDORES PRINCIPALES */
+    .nav-btn {
+      flex: 1;
+      padding: 10px 15px;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .nav-btn:hover { background: rgba(255,255,255,0.05); }
+
+    .nav-btn.active {
+      background: var(--info);
+      color: white;
+      box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+    }
+
+    /* --- CONTENEDORES --- */
     .dashboard-grid {
-      display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 600px; margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      width: 100%;
+      max-width: 600px;
+      margin-bottom: 20px;
     }
+
     #graph-view {
-      width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 15px;
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
     }
+
+    /* --- TARJETAS --- */
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 15px;
+      text-align: center;
+      border: 1px solid #334155;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
     .hidden { display: none !important; }
 
-    /* TARJETAS */
-    .card {
-      background: var(--card-bg); border-radius: 12px; padding: 15px; text-align: center;
-      border: 1px solid #334155; position: relative; overflow: hidden; display: flex;
-      flex-direction: column; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
+    /* Barra superior de color decorativa */
     .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: #64748b; opacity: 0.5; }
+
     .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 8px; font-weight: 500; }
     .value { font-size: 2.2rem; font-weight: 700; color: var(--text-main); }
     .unit { font-size: 0.9rem; color: #64748b; margin-left: 2px; }
+
+    /* Estilo especial tarjeta grande */
     .card.highlight { grid-column: span 2; background: linear-gradient(145deg, #1e293b, #0f172a); border-color: var(--info); }
-    .highlight .value { font-size: 3.5rem; color: var(--info); } .highlight::before { background: var(--info); opacity: 1; }
-    
-    /* GRÁFICOS */
+    .highlight .value { font-size: 3.5rem; color: var(--info); }
+    .highlight::before { background: var(--info); opacity: 1; }
+
+    /* --- ESTADOS DE COLOR --- */
+    .state-warning { border-color: var(--warning) !important; } 
+    .state-warning .value { color: var(--warning); } 
+    .state-warning::before { background: var(--warning); opacity: 1; }
+
+    .state-success { border-color: var(--accent) !important; } 
+    .state-success .value { color: var(--accent); } 
+    .state-success::before { background: var(--accent); opacity: 1; }
+
+    .state-danger { border-color: var(--danger) !important; } 
+    .state-danger .value { color: var(--danger); } 
+    .state-danger::before { background: var(--danger); opacity: 1; }
+
+    /* --- GRÁFICOS --- */
     .chart-container {
-      width: 100%; background: var(--card-bg); padding: 15px; border-radius: 12px;
-      border: 1px solid #334155; height: 260px; position: relative;
+      width: 100%;
+      background: var(--card-bg);
+      padding: 15px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      height: 260px;
+      position: relative;
     }
+    
     .chart-header {
-      font-size: 0.8rem; color: #94a3b8; text-transform: uppercase;
-      font-weight: 700; margin-bottom: 10px; text-align: left;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 10px;
+      text-align: left;
     }
   </style>
 </head>
@@ -94,161 +193,268 @@
     <button class="nav-btn" onclick="filterCategory('elec')">SISTEMAS</button>
   </div>
 
-  <div id="cards-view" class="dashboard-grid">
-    
-    <div class="card highlight cat-all cat-motor cat-elec cat-user" id="card-speed"><div class="label">Velocidad</div><div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div></div>
-    
-    <div class="card cat-all cat-motor cat-user" id="card-temp"><div class="label">Temp. Agua</div><div><span class="value" id="temp">--</span> <span class="unit">°C</span></div></div>
-    <div class="card cat-all cat-motor cat-user" id="card-oil"><div class="label">Temp. Aceite</div><div><span class="value" id="oil">--</span> <span class="unit">°C</span></div></div>
-    <div class="card cat-all cat-elec cat-user" id="card-fuel"><div class="label">Combustible</div><div><span class="value" id="fuel">--</span> <span class="unit">%</span></div></div>
-    <div class="card cat-all cat-elec cat-user" id="card-voltage"><div class="label">Batería</div><div><span class="value" id="voltage">--</span> <span class="unit">V</span></div></div>
-
-    <div class="card cat-all cat-motor" id="card-rpm"><div class="label">RPM</div><div><span class="value" id="rpm">--</span></div></div>
-    <div class="card cat-all cat-motor" id="card-map"><div class="label">Presión MAP</div><div><span class="value" id="map">--</span> <span class="unit">kPa</span></div></div>
-    <div class="card cat-all cat-motor" id="card-load"><div class="label">Carga Motor</div><div><span class="value" id="load">--</span> <span class="unit">%</span></div></div>
-    <div class="card cat-all cat-motor" id="card-throttle"><div class="label">Acelerador</div><div><span class="value" id="throttle">--</span> <span class="unit">%</span></div></div>
-    <div class="card cat-all cat-motor" id="card-iat"><div class="label">Temp. Admisión</div><div><span class="value" id="iat">--</span> <span class="unit">°C</span></div></div>
-    <div class="card cat-all cat-motor" id="card-lambda"><div class="label">Mezcla (λ)</div><div><span class="value" id="lambda">--</span> <span class="unit"></span></div></div>
-    <div class="card cat-all cat-motor" id="card-timing"><div class="label">Avance</div><div><span class="value" id="timing">--</span> <span class="unit">°</span></div></div>
+  <div id="graph-view" class="hidden">
+    <div class="chart-container">
+      <div class="chart-header">Velocidad / RPM (Último minuto)</div>
+      <canvas id="perfChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="chart-header">Temperatura Motor (Agua / Aceite)</div>
+      <canvas id="tempChart"></canvas>
+    </div>
   </div>
 
-  <div id="graph-view" class="hidden">
-    <div class="chart-container"><div class="chart-header">Velocidad / RPM (Último minuto)</div><canvas id="perfChart"></canvas></div>
-    <div class="chart-container"><div class="chart-header">Temperatura Motor (Agua / Aceite)</div><canvas id="tempChart"></canvas></div>
+  <div id="cards-view" class="dashboard-grid">
+    
+    <div class="card highlight cat-all cat-motor cat-elec cat-user" id="card-speed">
+      <div class="label">Velocidad</div>
+      <div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div>
+    </div>
+
+    <div class="card cat-all cat-motor" id="card-rpm">
+      <div class="label">RPM</div>
+      <div><span class="value" id="rpm">--</span></div>
+    </div>
+
+    <div class="card cat-all cat-motor cat-user" id="card-temp">
+      <div class="label">Temp. Agua</div>
+      <div><span class="value" id="temp">--</span> <span class="unit">°C</span></div>
+    </div>
+
+    <div class="card cat-all cat-motor cat-user" id="card-oil">
+      <div class="label">Temp. Aceite</div>
+      <div><span class="value" id="oil">--</span> <span class="unit">°C</span></div>
+    </div>
+
+    <div class="card cat-all cat-elec cat-user" id="card-fuel">
+      <div class="label">Combustible</div>
+      <div><span class="value" id="fuel">--</span> <span class="unit">%</span></div>
+    </div>
+
+    <div class="card cat-all cat-elec cat-user" id="card-voltage">
+      <div class="label">Batería</div>
+      <div><span class="value" id="voltage">--</span> <span class="unit">V</span></div>
+    </div>
+
+    <div class="card cat-all cat-motor" id="card-map">
+      <div class="label">Presión MAP</div>
+      <div><span class="value" id="map">--</span> <span class="unit">kPa</span></div>
+    </div>
+
+    <div class="card cat-all cat-motor" id="card-iat">
+      <div class="label">Temp. Admisión</div>
+      <div><span class="value" id="iat">--</span> <span class="unit">°C</span></div>
+    </div>
+
+    <div class="card cat-all cat-motor" id="card-load">
+      <div class="label">Carga Motor</div>
+      <div><span class="value" id="load">--</span> <span class="unit">%</span></div>
+    </div>
+
+    <div class="card cat-all cat-motor" id="card-throttle">
+      <div class="label">Acelerador</div>
+      <div><span class="value" id="throttle">--</span> <span class="unit">%</span></div>
+    </div>
+
+    <div class="card cat-all cat-motor" id="card-lambda">
+      <div class="label">Mezcla (λ)</div>
+      <div><span class="value" id="lambda">--</span> <span class="unit"></span></div>
+    </div>
+
+    <div class="card cat-motor" id="card-timing">
+      <div class="label">Avance</div>
+      <div><span class="value" id="timing">--</span> <span class="unit">°</span></div>
+    </div>
+
   </div>
 
   <script>
-    // --- CONFIGURACIÓN MQTT Y DOM ---
-    const broker = "broker.emqx.io"; const port = 8084; const topic = "coches/raspi1/telemetria";
-    const clientID = "fleet_stable_" + Math.random().toString(16).substr(2, 8);
+    // --- CONFIGURACIÓN MQTT ---
+    const broker = "broker.emqx.io";
+    const port = 8084;
+    const topic = "coches/raspi1/telemetria";
+    const clientID = "fleet_mon_" + Math.random().toString(16).substr(2, 8);
     const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
 
-    const cards = { 
-      speed: document.getElementById("speed"), rpm: document.getElementById("rpm"), temp: document.getElementById("temp"), oil: document.getElementById("oil"), 
-      map: document.getElementById("map"), load: document.getElementById("load"), fuel: document.getElementById("fuel"), voltage: document.getElementById("voltage"), 
-      throttle: document.getElementById("throttle"), iat: document.getElementById("iat"), lambda: document.getElementById("lambda"), timing: document.getElementById("timing")
-    };
-    
-    // Almacena el ultimo valor para mantener la visualizacion de las tarjetas.
-    const lastDisplayedValues = { 
-        speed: 0, rpm: 0, temp: 0, oil: 0, map: 0, load: 0, fuel: 0, voltage: 0, 
-        throttle: 0, iat: 0, lambda: 0, timing: 0
+    // Mapeo de elementos DOM
+    const cards = {
+      speed: document.getElementById("speed"),
+      rpm: document.getElementById("rpm"),
+      temp: document.getElementById("temp"),
+      oil: document.getElementById("oil"),
+      map: document.getElementById("map"),
+      iat: document.getElementById("iat"),
+      load: document.getElementById("load"),
+      throttle: document.getElementById("throttle"),
+      lambda: document.getElementById("lambda"),
+      timing: document.getElementById("timing"),
+      fuel: document.getElementById("fuel"),
+      voltage: document.getElementById("voltage")
     };
 
-
-    // --- GRÁFICOS ---
+    // --- GRÁFICO 1: USO (Velocidad / RPM) ---
     const ctx1 = document.getElementById('perfChart').getContext('2d');
-    const perfChart = new Chart(ctx1, { type: 'line', data: { labels: [], datasets: [ { label: 'Velocidad', data: [], borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y', pointRadius: 0, tension: 0.3 }, { label: 'RPM', data: [], borderColor: '#f59e0b', borderWidth: 2, yAxisID: 'y1', pointRadius: 0, tension: 0.3 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { type: 'linear', position: 'left', ticks: { color: '#3b82f6' }, grid: { color: '#334155' } }, y1: { type: 'linear', display: true, position: 'right', ticks: { color: '#f59e0b', callback: v => v/1000 + 'k' }, grid: { drawOnChartArea: false } } } } });
-    const ctx2 = document.getElementById('tempChart').getContext('2d');
-    const tempChart = new Chart(ctx2, { type: 'line', data: { labels: [], datasets: [ { label: 'Agua', data: [], borderColor: '#22d3ee', borderWidth: 2, pointRadius: 0, tension: 0.4 }, { label: 'Aceite', data: [], borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, tension: 0.4 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' }, suggestedMin: 50, suggestedMax: 110 } } } });
-
-
-    // --- LÓGICA DE PERSISTENCIA Y ACTUALIZACIÓN ---
-
-    function updateDataAndState(data) {
-        let currentValues = {};
-        const updateAlwaysMetrics = ['speed', 'rpm', 'voltage', 'fuel']; 
-
-        for (const [key, el] of Object.entries(cards)) { 
-            const value = data[key];
-
-            if (value !== undefined) {
-                
-                if (updateAlwaysMetrics.includes(key)) {
-                    // Velocidad/RPM/Voltaje/Fuel: Actualizar siempre, incluso si es 0
-                    el.innerText = value;
-                    lastDisplayedValues[key] = value;
-                    currentValues[key] = value;
-                } else if (value > 0) {
-                    // Para Temp/Oil/MAP/etc.: Solo si es POSITIVO (> 0), lo actualizamos.
-                    el.innerText = value;
-                    lastDisplayedValues[key] = value;
-                    currentValues[key] = value;
-                } else {
-                    // Si es 0 o indefinido, usar el valor persistente para el display y la gráfica
-                    el.innerText = lastDisplayedValues[key] > 0 ? lastDisplayedValues[key] : "--";
-                    currentValues[key] = lastDisplayedValues[key]; 
-                }
-            } else {
-                // Si el dato no viene, usar el valor persistente
-                currentValues[key] = lastDisplayedValues[key];
-            }
+    const perfChart = new Chart(ctx1, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'Velocidad', data: [], borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y', pointRadius: 0, tension: 0.3 },
+          { label: 'RPM', data: [], borderColor: '#f59e0b', borderWidth: 2, yAxisID: 'y1', pointRadius: 0, tension: 0.3 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { labels: { color: '#94a3b8' } } },
+        scales: {
+          x: { ticks: { display: false }, grid: { color: '#334155' } },
+          y: { type: 'linear', position: 'left', ticks: { color: '#3b82f6' }, grid: { color: '#334155' } },
+          y1: { type: 'linear', display: true, position: 'right', ticks: { color: '#f59e0b', callback: v => v/1000 + 'k' }, grid: { drawOnChartArea: false } }
         }
-        
-        // Ejecutar lógicas de color y gráfica con los valores persistentes.
-        updateStatus(currentValues);
-        updateCharts(currentValues); 
+      }
+    });
+
+    // --- GRÁFICO 2: TÉRMICO (Agua / Aceite) ---
+    const ctx2 = document.getElementById('tempChart').getContext('2d');
+    const tempChart = new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'Agua', data: [], borderColor: '#22d3ee', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+          { label: 'Aceite', data: [], borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, tension: 0.4 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { labels: { color: '#94a3b8' } } },
+        scales: {
+          x: { ticks: { display: false }, grid: { color: '#334155' } },
+          y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' }, suggestedMin: 50, suggestedMax: 110 }
+        }
+      }
+    });
+
+    // --- LÓGICA DE COLORES Y ALERTAS ---
+    function updateStatus(data) {
+      // 1. Temperaturas
+      setColor("card-temp", data.temp, 40, 100); // Agua: OK entre 40 y 100
+      setColor("card-oil", data.oil, 50, 120);   // Aceite: OK entre 50 y 120
+      
+      // 2. Batería
+      // < 11.5V: Crítico | 11.5-12.0V: Bajo | 12.0-14.8V: OK | > 14.8V: Sobrecarga
+      setColor("card-voltage", data.voltage, 12.0, 14.8);
+
+      // 3. Combustible y Alerta Visual
+      const elFuel = document.getElementById("card-fuel");
+      const alertBox = document.getElementById("fuel-alert");
+
+      // Estado tarjeta normal
+      elFuel.classList.remove('state-danger', 'state-success');
+      if (data.fuel < 15) elFuel.classList.add('state-danger');
+      else elFuel.classList.add('state-success');
+
+      // Overlay de Alerta Gigante (< 15%)
+      if (data.fuel > 0 && data.fuel < 15) {
+        alertBox.style.display = "block";
+      } else {
+        alertBox.style.display = "none";
+      }
     }
 
-    function updateStatus(data) {
-      setColor("card-temp", data.temp, 40, 100); setColor("card-oil", data.oil, 50, 120); setColor("card-voltage", data.voltage, 12.0, 14.8);
-      const elFuel = document.getElementById("card-fuel"); const alertBox = document.getElementById("fuel-alert");
-      elFuel.classList.remove('state-danger', 'state-success'); if (data.fuel < 15) elFuel.classList.add('state-danger'); else elFuel.classList.add('state-success');
-      if (data.fuel > 0 && data.fuel < 15) alertBox.style.display = "block"; else alertBox.style.display = "none";
-    }
     function setColor(cardId, val, minOk, maxOk) {
-      const el = document.getElementById(cardId); el.classList.remove('state-warning', 'state-success', 'state-danger'); if(val == 0 || val == undefined) return;
-      if (val >= minOk && val <= maxOk) el.classList.add('state-success');
-      else if (val < minOk) { if (cardId === 'card-voltage' && val < 11.5) el.classList.add('state-danger'); else el.classList.add('state-warning'); } else el.classList.add('state-danger');
+      const el = document.getElementById(cardId);
+      el.classList.remove('state-warning', 'state-success', 'state-danger');
+      if(val == 0 || val == undefined) return;
+
+      if (val >= minOk && val <= maxOk) {
+        el.classList.add('state-success'); // Verde
+      } else if (val < minOk) {
+         // Lógica especial para voltaje bajo: Rojo si es crítico
+         if (cardId === 'card-voltage' && val < 11.5) el.classList.add('state-danger');
+         else el.classList.add('state-warning'); // Amarillo si es solo bajo/frio
+      } else {
+        el.classList.add('state-danger'); // Rojo (Exceso)
+      }
     }
-    
-    // Función central: Se encarga de dibujar la gráfica
+
+    // --- ACTUALIZACIÓN DE GRÁFICOS ---
     function updateCharts(data) {
         const timeStr = new Date().getSeconds();
-        
-        const speedVal = data.speed;
-        const rpmVal = data.rpm;
-        
-        // Temperaturas: si el valor es 0, usamos NaN para que la línea no caiga.
-        const tempVal = data.temp > 0 ? data.temp : NaN; 
-        const oilVal = data.oil > 0 ? data.oil : NaN;
 
-        perfChart.data.labels.push(timeStr); 
-        perfChart.data.datasets[0].data.push(speedVal); 
-        perfChart.data.datasets[1].data.push(rpmVal);
+        // Push data
+        perfChart.data.labels.push(timeStr);
+        perfChart.data.datasets[0].data.push(data.speed);
+        perfChart.data.datasets[1].data.push(data.rpm);
+
+        tempChart.data.labels.push(timeStr);
+        tempChart.data.datasets[0].data.push(data.temp);
+        tempChart.data.datasets[1].data.push(data.oil);
+
+        // Mantener histórico de 60 puntos
+        if (perfChart.data.labels.length > 60) {
+            perfChart.data.labels.shift();
+            perfChart.data.datasets[0].data.shift();
+            perfChart.data.datasets[1].data.shift();
+            tempChart.data.labels.shift();
+            tempChart.data.datasets[0].data.shift();
+            tempChart.data.datasets[1].data.shift();
+        }
         
-        tempChart.data.labels.push(timeStr); 
-        tempChart.data.datasets[0].data.push(tempVal); 
-        tempChart.data.datasets[1].data.push(oilVal);
-        
-        if (perfChart.data.labels.length > 60) { perfChart.data.labels.shift(); perfChart.data.datasets[0].data.shift(); perfChart.data.datasets[1].data.shift(); tempChart.data.labels.shift(); tempChart.data.datasets[0].data.shift(); tempChart.data.datasets[1].data.shift(); }
-        perfChart.update(); tempChart.update();
+        perfChart.update();
+        tempChart.update();
     }
 
     // --- GESTIÓN DE PESTAÑAS ---
     function filterCategory(cat) {
-      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); event.target.classList.add('active');
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
 
-      const views = { cards: document.getElementById('cards-view'), graph: document.getElementById('graph-view') };
-
-      for (let key in views) views[key].classList.add('hidden');
+      const graphView = document.getElementById('graph-view');
+      const cardsView = document.getElementById('cards-view');
 
       if (cat === 'graph') {
-        views.graph.classList.remove('hidden');
-        perfChart.resize(); tempChart.resize();
-      } else { 
-        views.cards.classList.remove('hidden');
-        document.querySelectorAll('.card').forEach(card => { 
-          card.classList.add('hidden'); 
-          if (cat === 'all') { if(card.classList.contains('cat-all')) card.classList.remove('hidden'); } 
-          else if (cat === 'user') { if(card.classList.contains('cat-user')) card.classList.remove('hidden'); }
-          else if (cat === 'motor') { if(card.classList.contains('cat-motor')) card.classList.remove('hidden'); }
-          else if (cat === 'elec') { if(card.classList.contains('cat-elec')) card.classList.remove('hidden'); }
+        graphView.classList.remove('hidden');
+        cardsView.classList.add('hidden');
+      } else {
+        graphView.classList.add('hidden');
+        cardsView.classList.remove('hidden');
+        
+        const allCards = document.querySelectorAll('.card');
+        allCards.forEach(card => {
+            card.classList.add('hidden');
+            if (cat === 'all') {
+                if(card.classList.contains('cat-all')) card.classList.remove('hidden');
+            } else {
+                if(card.classList.contains('cat-' + cat)) card.classList.remove('hidden');
+            }
         });
       }
     }
 
-    window.onload = function() { filterCategory('user', document.querySelector('.nav-btn.active')); };
+    // Cargar pestaña PRINCIPAL al inicio
+    window.onload = function() { document.querySelector('.nav-btn').click(); };
 
     // --- RECEPCIÓN MQTT ---
-    client.onMessageArrived = (msg) => { 
-      try { 
+    client.onMessageArrived = (msg) => {
+      try {
         const data = JSON.parse(msg.payloadString);
-        updateDataAndState(data); // Llamada a la función de persistencia
-      } catch (e) { console.error(e); } 
+        
+        // Actualizar textos
+        for (const [key, el] of Object.entries(cards)) {
+            if(data[key] !== undefined) el.innerText = data[key];
+        }
+        
+        // Actualizar estados visuales y gráficos
+        updateStatus(data);
+        updateCharts(data);
+      } catch (e) { console.error(e); }
     };
 
-    client.connect({ useSSL: true, onSuccess: () => { console.log("Conectado"); client.subscribe(topic); }});
+    client.connect({ useSSL: true, onSuccess: () => { 
+      console.log("Sistema Conectado");
+      client.subscribe(topic); 
+    }});
   </script>
 </body>
 </html>
