@@ -174,6 +174,10 @@
         lat: 0.0, lon: 0.0, sats: 0 
     };
 
+    // --- VARIABLES DE CONTROL DE FRECUENCIA DEL MAPA ---
+    let mapUpdateCounter = 0;
+    const MAP_UPDATE_RATE = 3; // Actualizar el mapa solo cada 3 segundos
+
 
     // --- GRÁFICOS (Mantenidos) ---
     const ctx1 = document.getElementById('perfChart').getContext('2d');
@@ -184,14 +188,21 @@
     // --- MAPA ESTATICO (Implementación SIMPLE y FIABLE) ---
 
     function updateMap(lat, lon, sats) {
-      // 1. Actualizar coordenadas en la PESTAÑA LOCALIZACIÓN (FIX)
+      // 1. Actualizar coordenadas en la PESTAÑA LOCALIZACIÓN (SIEMPRE)
       mapCoords.lat.innerText = lat ? lat.toFixed(6) : "--.----";
       mapCoords.lon.innerText = lon ? lon.toFixed(6) : "--.----";
       mapCoords.sats.innerText = sats;
 
+      // Solo actualizamos el IFRAME si estamos en la pestaña y si el contador lo permite
+      if (document.getElementById('location-view').classList.contains('hidden') || mapUpdateCounter % MAP_UPDATE_RATE !== 0) {
+          mapUpdateCounter++;
+          return;
+      }
+      
       if (lat === 0 || lon === 0 || sats === 0) {
         // Mostrar mapa predeterminado (Madrid) si no hay señal
         mapFrame.src = `https://maps.google.com/maps?q=40.4168,-3.7038&z=13&output=embed`;
+        mapUpdateCounter++;
         return;
       }
       
@@ -200,6 +211,7 @@
       
       // 3. Actualizar la fuente del iframe
       mapFrame.src = mapUrl;
+      mapUpdateCounter++;
     }
 
 
@@ -291,7 +303,7 @@
         perfChart.resize(); tempChart.resize();
       } else if (cat === 'location') { // LÓGICA DE LOCALIZACIÓN
         views.location.classList.remove('hidden');
-        // No se necesita initMap ni invalidateSize, el iframe es estático.
+        // No se necesita initMap ni invalidateSize
         
       } else { 
         views.cards.classList.remove('hidden');
