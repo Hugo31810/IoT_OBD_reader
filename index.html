@@ -1,333 +1,253 @@
+¡Entendido! Vamos a modificar tu código HTML para:
+
+1. **Eliminar las coordenadas** de la pestaña principal.
+2. Añadir un **aviso de "RESERVA"** en grande como una notificación destacada.
+3. Implementar la lógica de JavaScript para pintar de **colores (verde, naranja, rojo)** los contenedores de **Temperatura Agua, Aceite, Combustible y Batería** según umbrales predefinidos.
+
+He aquí el código HTML y JavaScript actualizado.
+
+###📄 Código HTML y JavaScript Actualizado```html
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Monitor de Vehiculo GPS</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Telemetría Vehículo</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px; }
+        .container { display: flex; flex-wrap: wrap; gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .panel { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); flex: 1 1 300px; min-width: 250px; }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        
+        /* Estilos de los contenedores de colores */
+        .gauge-panel { text-align: center; }
+        .gauge-panel h3 { margin: 5px 0; }
+        .gauge-panel .value { font-size: 2.5em; font-weight: bold; margin-bottom: 10px; padding: 10px; border-radius: 6px; color: white; }
+        
+        /* Colores de estado */
+        .color-green { background-color: #4CAF50; } /* Normal */
+        .color-orange { background-color: #FF9800; } /* Advertencia / Límite */
+        .color-red { background-color: #F44336; } /* Peligro / Reserva */
 
-  <style>
-    :root {
-      --bg-color: #0f172a; --card-bg: #1e293b; --text-main: #f8fafc;
-      --accent: #10b981; --danger: #ef4444; --warning: #f59e0b; --info: #3b82f6;
-    }
+        /* Estilo de la Notificación de Reserva */
+        #reserva-notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(244, 67, 54, 0.95); /* Rojo semi-transparente */
+            color: white;
+            padding: 40px 60px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            font-size: 3em;
+            font-weight: bold;
+            text-align: center;
+            z-index: 1000;
+            display: none; /* Inicialmente oculto */
+            animation: pulse 1s infinite alternate;
+        }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+        @keyframes pulse {
+            from { transform: translate(-50%, -50%) scale(1); opacity: 0.95; }
+            to { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+        }
 
-    body {
-      background-color: var(--bg-color); color: var(--text-main); font-family: 'Roboto', sans-serif;
-      display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 15px;
-    }
+        /* Estilos para ocultar la pestaña de Coordenadas */
+        .coord-hidden { display: none; }
 
-    /* ALERTA COMBUSTIBLE */
-    #fuel-alert {
-      position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%);
-      background-color: rgba(220, 38, 38, 0.95); color: white; padding: 25px 50px;
-      border-radius: 12px; border: 2px solid #fca5a5; text-align: center;
-      z-index: 9999; box-shadow: 0 0 60px rgba(0,0,0,0.8); display: none;
-      animation: alert-blink 0.8s infinite alternate;
-    }
-    .alert-icon { font-size: 3rem; display: block; margin-bottom: 10px; }
-    .alert-title { font-size: 1.5rem; font-weight: 700; text-transform: uppercase; display: block; }
-    @keyframes alert-blink { 0% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.02); } }
-
-    /* NAVEGACIÓN */
-    .nav-tabs {
-      display: flex; gap: 8px; margin-bottom: 20px; background: #1e293b; padding: 6px;
-      border-radius: 12px; width: 100%; max-width: 600px; overflow-x: auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-    .nav-btn {
-      flex: 1; padding: 10px 15px; background: transparent; border: none; color: #94a3b8;
-      font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s; white-space: nowrap;
-    }
-    .nav-btn.active { background: var(--info); color: white; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); }
-
-    /* CONTENEDORES PRINCIPALES */
-    .dashboard-grid {
-      display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 600px; margin-bottom: 20px;
-    }
-    #graph-view, #location-view {
-      width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 15px;
-    }
-    .hidden { display: none !important; }
-
-    /* TARJETAS */
-    .card {
-      background: var(--card-bg); border-radius: 12px; padding: 15px; text-align: center;
-      border: 1px solid #334155; position: relative; overflow: hidden; display: flex;
-      flex-direction: column; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-    .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: #64748b; opacity: 0.5; }
-    .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 8px; font-weight: 500; }
-    .value { font-size: 2.2rem; font-weight: 700; color: var(--text-main); }
-    .unit { font-size: 0.9rem; color: #64748b; margin-left: 2px; }
-    .card.highlight { grid-column: span 2; background: linear-gradient(145deg, #1e293b, #0f172a); border-color: var(--info); }
-    .highlight .value { font-size: 3.5rem; color: var(--info); } .highlight::before { background: var(--info); opacity: 1; }
-    
-    /* GPS CARDS Y LOCATION VIEW STYLES */
-    .gps-coords { font-size: 1.1rem; font-family: monospace; color: var(--text-main); display: flex; flex-direction: column; gap: 5px; }
-    .gps-sats { font-size: 0.8rem; color: #94a3b8; margin-top: 8px; }
-    
-    /* ESTILO ESPECIFICO DE MAPA */
-    /* Usamos un iframe para incrustar el mapa estatico */
-    #map-iframe { border: none; height: 350px; width: 100%; border-radius: 8px; border: 1px solid #334155; background-color: #334155; }
-    .location-info { 
-        background: var(--card-bg); border-radius: 12px; padding: 15px; margin-bottom: 15px; text-align: center; border: 1px solid #334155; box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
-    }
-    .location-info .gps-coords { font-size: 1.5rem; }
-
-
-    /* GRÁFICOS */
-    .chart-container {
-      width: 100%; background: var(--card-bg); padding: 15px; border-radius: 12px;
-      border: 1px solid #334155; height: 260px; position: relative;
-    }
-    .chart-header {
-      font-size: 0.8rem; color: #94a3b8; text-transform: uppercase;
-      font-weight: 700; margin-bottom: 10px; text-align: left;
-    }
-  </style>
+    </style>
 </head>
 <body>
 
-  <div id="fuel-alert">
-    <span class="alert-icon">⛽</span>
-    <span class="alert-title">Reserva</span>
-    <span class="alert-desc">Nivel de combustible bajo</span>
-  </div>
+    <div id="reserva-notification">¡RESERVA DE COMBUSTIBLE ACTIVA!</div>
 
-  <div class="nav-tabs">
-    <button class="nav-btn active" onclick="filterCategory('user')">PRINCIPAL</button>
-    <button class="nav-btn" onclick="filterCategory('graph')">HISTÓRICO</button>
-    <button class="nav-btn" onclick="filterCategory('location')">LOCALIZACIÓN</button> 
-    <button class="nav-btn" onclick="filterCategory('all')">TÉCNICO (TODO)</button>
-    <button class="nav-btn" onclick="filterCategory('motor')">MOTOR</button>
-    <button class="nav-btn" onclick="filterCategory('elec')">SISTEMAS</button>
-  </div>
+    <div class="container">
+        
+        <div class="panel" style="flex: 1 1 200px;">
+            <h2>Estado de Conexión</h2>
+            <p><strong>Última Actualización:</strong> <span id="last_update">Cargando...</span></p>
+            <p><strong>Estado:</strong> <span id="connection_status">Desconectado</span></p>
+        </div>
 
-  <div id="cards-view" class="dashboard-grid">
-    
-    <div class="card highlight cat-all cat-motor cat-elec cat-user" id="card-speed"><div class="label">Velocidad</div><div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div></div>
-    
-    <div class="card cat-all cat-user cat-elec" style="border-color: var(--info);">
-      <div class="label">Posicion GPS</div>
-      <div class="gps-coords">
-        <div>Lat: <span id="lat">--.----</span></div>
-        <div>Lon: <span id="lon">--.----</span></div>
-      </div>
-      <div class="gps-sats">Satélites: <span id="sats">0</span></div>
+        <div class="panel" style="flex: 3 1 700px; display: flex; flex-wrap: wrap; gap: 15px;">
+            <h2>Medidas del Vehículo</h2>
+            
+            <div id="temp_agua_gauge" class="gauge-panel">
+                <h3>Temperatura Agua (°C)</h3>
+                <div id="temp_agua_value" class="value color-green">--</div>
+            </div>
+
+            <div id="temp_aceite_gauge" class="gauge-panel">
+                <h3>Temperatura Aceite (°C)</h3>
+                <div id="temp_aceite_value" class="value color-green">--</div>
+            </div>
+
+            <div id="combustible_gauge" class="gauge-panel">
+                <h3>Combustible (%)</h3>
+                <div id="combustible_value" class="value color-green">--</div>
+            </div>
+
+            <div id="bateria_gauge" class="gauge-panel">
+                <h3>Batería (V)</h3>
+                <div id="bateria_value" class="value color-green">--</div>
+            </div>
+
+            <div class="gauge-panel">
+                <h3>Velocidad (Km/h)</h3>
+                <div class="value" style="background-color: #3f51b5;">
+                    <span id="velocidad_value">--</span>
+                </div>
+            </div>
+
+            <div class="gauge-panel">
+                <h3>RPM</h3>
+                <div class="value" style="background-color: #00bcd4;">
+                    <span id="rpm_value">--</span>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="panel coord-hidden">
+            <h2>Ubicación GPS</h2>
+            <p>Latitud: <span id="latitude">--</span></p>
+            <p>Longitud: <span id="longitude">--</span></p>
+        </div>
+        
     </div>
-    <div class="card cat-all cat-motor cat-user" id="card-temp"><div class="label">Temp. Agua</div><div><span class="value" id="temp">--</span> <span class="unit">°C</span></div></div>
-    <div class="card cat-all cat-motor cat-user" id="card-oil"><div class="label">Temp. Aceite</div><div><span class="value" id="oil">--</span> <span class="unit">°C</span></div></div>
-    <div class="card cat-all cat-elec cat-user" id="card-fuel"><div class="label">Combustible</div><div><span class="value" id="fuel">--</span> <span class="unit">%</span></div></div>
-    <div class="card cat-all cat-elec cat-user" id="card-voltage"><div class="label">Bateria</div><div><span class="value" id="voltage">--</span> <span class="unit">V</span></div></div>
 
-    <div class="card cat-all cat-motor" id="card-rpm"><div class="label">RPM</div><div><span class="value" id="rpm">--</span></div></div>
-    <div class="card cat-all cat-motor" id="card-map"><div class="label">Presion MAP</div><div><span class="value" id="map">--</span> <span class="unit">kPa</span></div></div>
-    <div class="card cat-all cat-motor" id="card-load"><div class="label">Carga Motor</div><div><span class="value" id="load">--</span> <span class="unit">%</span></div></div>
-    <div class="card cat-all cat-motor" id="card-throttle"><div class="label">Acelerador</div><div><span class="value" id="throttle">--</span> <span class="unit">%</span></div></div>
-    <div class="card cat-all cat-motor" id="card-iat"><div class="label">Temp. Admision</div><div><span class="value" id="iat">--</span> <span class="unit">°C</span></div></div>
-    <div class="card cat-all cat-motor" id="card-lambda"><div class="label">Mezcla (lambda)</div><div><span class="value" id="lambda">--</span> <span class="unit"></span></div></div>
-    <div class="card cat-all cat-motor" id="card-timing"><div class="label">Avance</div><div><span class="value" id="timing">--</span> <span class="unit">°</span></div></div>
-  </div>
+    <script>
+        // --- UMBRALES DE COLOR (Valores de ejemplo) ---
+        const UMBRALES = {
+            temp_agua: { normal: 80, warning: 95, danger: 105 }, // (°C)
+            temp_aceite: { normal: 90, warning: 115, danger: 125 }, // (°C)
+            combustible: { normal: 25, warning: 15, danger: 10 }, // (%) - IMPORTANTE: PELIGRO es el valor más bajo (RESERVA)
+            bateria: { normal_min: 12.5, normal_max: 14.8, warning_min: 11.8, warning_max: 15.2, danger_low: 11.5, danger_high: 15.5 } // (V)
+        };
 
-  <div id="graph-view" class="hidden">
-    <div class="chart-container"><div class="chart-header">Velocidad / RPM (Ultimo minuto)</div><canvas id="perfChart"></canvas></div>
-    <div class="chart-container"><div class="chart-header">Temperatura Motor (Agua / Aceite)</div><canvas id="tempChart"></canvas></div>
-  </div>
+        /**
+         * Asigna el color de fondo a un elemento basado en el valor y los umbrales.
+         * @param {HTMLElement} element - El elemento div que contiene el valor.
+         * @param {number} value - El valor actual de la métrica.
+         * @param {string} metricKey - La clave de la métrica en la constante UMBRALES.
+         */
+        function updateColor(element, value, metricKey) {
+            // Limpia todas las clases de color
+            element.classList.remove('color-green', 'color-orange', 'color-red');
 
-  <div id="location-view" class="hidden">
-    <div class="location-info">
-      <div class="label">UBICACIÓN ACTUAL Y ESTADO GPS</div>
-      <div class="gps-coords">
-        <div>Lat: <span id="map-lat">--.----</span></div>
-        <div>Lon: <span id="map-lon">--.----</span></div>
-      </div>
-      <div class="gps-sats">Satélites: <span id="map-sats">0</span></div>
-    </div>
-    <iframe id="map-iframe" src="about:blank" title="Mapa de Ubicación GPS"></iframe>
-  </div>
-  <script>
-    // --- CONFIGURACIÓN MQTT ---
-    const broker = "broker.emqx.io"; const port = 8084; const topic = "coches/raspi1/telemetria";
-    const clientID = "fleet_gps_final_" + Math.random().toString(16).substr(2, 8);
-    const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
+            const umbral = UMBRALES[metricKey];
+            let colorClass = 'color-green'; // Por defecto, es verde
 
-    const cards = { 
-      speed: document.getElementById("speed"), rpm: document.getElementById("rpm"), temp: document.getElementById("temp"), oil: document.getElementById("oil"), 
-      map: document.getElementById("map"), load: document.getElementById("load"), fuel: document.getElementById("fuel"), voltage: document.getElementById("voltage"), 
-      throttle: document.getElementById("throttle"), iat: document.getElementById("iat"), lambda: document.getElementById("lambda"), timing: document.getElementById("timing"),
-      // GPS Cards PRINCIPAL
-      lat: document.getElementById("lat"), lon: document.getElementById("lon"), sats: document.getElementById("sats")
-    };
-    // Elementos de la pestaña LOCALIZACIÓN
-    const mapCoords = { lat: document.getElementById("map-lat"), lon: document.getElementById("map-lon"), sats: document.getElementById("map-sats") }
-    const mapFrame = document.getElementById("map-iframe");
-    
-    // Almacena el ultimo valor para persistencia en tarjetas
-    const lastDisplayedValues = { 
-        speed: 0, rpm: 0, temp: 0, oil: 0, map: 0, load: 0, fuel: 0, voltage: 0, 
-        throttle: 0, iat: 0, lambda: 0, timing: 0,
-        lat: 0.0, lon: 0.0, sats: 0 
-    };
-
-    // --- VARIABLES DE CONTROL DE FRECUENCIA DEL MAPA ---
-    let mapUpdateCounter = 0;
-    const MAP_UPDATE_RATE = 3; // Actualizar el mapa solo cada 3 segundos
-
-
-    // --- GRÁFICOS (Mantenidos) ---
-    const ctx1 = document.getElementById('perfChart').getContext('2d');
-    const perfChart = new Chart(ctx1, { type: 'line', data: { labels: [], datasets: [ { label: 'Velocidad', data: [], borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y', pointRadius: 0, tension: 0.3 }, { label: 'RPM', data: [], borderColor: '#f59e0b', borderWidth: 2, yAxisID: 'y1', pointRadius: 0, tension: 0.3 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { type: 'linear', position: 'left', ticks: { color: '#3b82f6' }, grid: { color: '#334155' } }, y1: { type: 'linear', display: true, position: 'right', ticks: { color: '#f59e0b', callback: v => v/1000 + 'k' }, grid: { drawOnChartArea: false } } } } });
-    const ctx2 = document.getElementById('tempChart').getContext('2d');
-    const tempChart = new Chart(ctx2, { type: 'line', data: { labels: [], datasets: [ { label: 'Agua', data: [], borderColor: '#22d3ee', borderWidth: 2, pointRadius: 0, tension: 0.4 }, { label: 'Aceite', data: [], borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, tension: 0.4 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' }, suggestedMin: 50, suggestedMax: 110 } } } });
-
-    // --- MAPA ESTATICO (Implementación SIMPLE y FIABLE) ---
-
-    function updateMap(lat, lon, sats) {
-      // 1. Actualizar coordenadas en la PESTAÑA LOCALIZACIÓN (SIEMPRE)
-      mapCoords.lat.innerText = lat ? lat.toFixed(6) : "--.----";
-      mapCoords.lon.innerText = lon ? lon.toFixed(6) : "--.----";
-      mapCoords.sats.innerText = sats;
-
-      // Solo actualizamos el IFRAME si estamos en la pestaña y si el contador lo permite
-      if (document.getElementById('location-view').classList.contains('hidden') || mapUpdateCounter % MAP_UPDATE_RATE !== 0) {
-          mapUpdateCounter++;
-          return;
-      }
-      
-      if (lat === 0 || lon === 0 || sats === 0) {
-        // Mostrar mapa predeterminado (Madrid) si no hay señal
-        mapFrame.src = `https://maps.google.com/maps?q=40.4168,-3.7038&z=13&output=embed`;
-        mapUpdateCounter++;
-        return;
-      }
-      
-      // 2. Generar URL de incrustación del mapa con marcador
-      const mapUrl = `https://maps.google.com/maps?q=${lat},${lon}&z=16&output=embed&marker=${lat},${lon}`;
-      
-      // 3. Actualizar la fuente del iframe
-      mapFrame.src = mapUrl;
-      mapUpdateCounter++;
-    }
-
-
-    // --- LÓGICA DE PERSISTENCIA Y ACTUALIZACIÓN ---
-
-    function updateDataAndState(data) {
-        let currentValues = {};
-        const updateAlwaysMetrics = ['speed', 'rpm', 'voltage', 'fuel', 'lat', 'lon', 'sats']; 
-
-        for (const [key, el] of Object.entries(cards)) { 
-            const value = data[key];
-
-            if (value !== undefined) {
-                
-                if (updateAlwaysMetrics.includes(key)) {
-                    // Actualizar siempre. Aceptar 0 para Speed/RPM/Voltaje/Fuel/GPS
-                    el.innerText = value;
-                    lastDisplayedValues[key] = value;
-                    currentValues[key] = value;
-                } else if (value > 0) {
-                    // Temp/Oil/MAP/etc.: Solo si es POSITIVO (> 0), lo actualizamos.
-                    el.innerText = value;
-                    lastDisplayedValues[key] = value;
-                    currentValues[key] = value;
+            if (metricKey === 'bateria') {
+                // Lógica especial para la batería (rango)
+                if (value < umbral.danger_low || value > umbral.danger_high) {
+                    colorClass = 'color-red';
+                } else if (value < umbral.warning_min || value > umbral.warning_max) {
+                    colorClass = 'color-orange';
                 } else {
-                    // Si el valor es 0 o indefinido, usar el valor persistente
-                    el.innerText = lastDisplayedValues[key] > 0 ? lastDisplayedValues[key] : "--";
-                    currentValues[key] = lastDisplayedValues[key]; 
+                    colorClass = 'color-green';
+                }
+            } else if (metricKey === 'combustible') {
+                // Lógica de reserva (peligro en el valor más bajo)
+                if (value <= umbral.danger) {
+                    colorClass = 'color-red';
+                    document.getElementById('reserva-notification').style.display = 'block';
+                } else if (value <= umbral.warning) {
+                    colorClass = 'color-orange';
+                    document.getElementById('reserva-notification').style.display = 'none'; // Ocultar si está en advertencia
+                } else {
+                    colorClass = 'color-green';
+                    document.getElementById('reserva-notification').style.display = 'none';
                 }
             } else {
-                // Si el dato no viene, usar el valor persistente
-                currentValues[key] = lastDisplayedValues[key];
+                // Lógica general (peligro en el valor más alto)
+                if (value >= umbral.danger) {
+                    colorClass = 'color-red';
+                } else if (value >= umbral.warning) {
+                    colorClass = 'color-orange';
+                } else {
+                    colorClass = 'color-green';
+                }
             }
+
+            element.classList.add(colorClass);
         }
-        
-        // Ejecutar lógicas de color y gráfica con los valores persistentes.
-        updateStatus(currentValues);
-        updateCharts(currentValues); 
-        
-        // Llamada al mapa (utiliza los valores persistentes de currentValues)
-        updateMap(currentValues.lat, currentValues.lon, currentValues.sats);
-    }
 
-    function updateStatus(data) {
-      setColor("card-temp", data.temp, 40, 100); setColor("card-oil", data.oil, 50, 120); setColor("card-voltage", data.voltage, 12.0, 14.8);
-      const elFuel = document.getElementById("card-fuel"); const alertBox = document.getElementById("fuel-alert");
-      elFuel.classList.remove('state-danger', 'state-success'); if (data.fuel < 15) elFuel.classList.add('state-danger'); else elFuel.classList.add('state-success');
-      if (data.fuel > 0 && data.fuel < 15) alertBox.style.display = "block"; else alertBox.style.display = "none";
-    }
-    function setColor(cardId, val, minOk, maxOk) {
-      const el = document.getElementById(cardId); el.classList.remove('state-warning', 'state-success', 'state-danger'); if(val == 0 || val == undefined) return;
-      if (val >= minOk && val <= maxOk) el.classList.add('state-success');
-      else if (val < minOk) { if (cardId === 'card-voltage' && val < 11.5) el.classList.add('state-danger'); else el.classList.add('state-warning'); } else el.classList.add('state-danger');
-    }
-    
-    // Función central: Se encarga de dibujar la gráfica
-    function updateCharts(data) {
-        const timeStr = new Date().getSeconds();
-        
-        const speedVal = data.speed;
-        const rpmVal = data.rpm;
-        
-        // Temperaturas/Presiones: si el valor persistente es 0, usamos NaN para que la línea no caiga.
-        const tempVal = data.temp > 0 ? data.temp : NaN; 
-        const oilVal = data.oil > 0 ? data.oil : NaN;
+        // --- FUNCIÓN DE EJEMPLO PARA RECIBIR DATOS (Simulación) ---
+        function updateTelemetry(data) {
+            // Actualiza la hora de la última actualización
+            document.getElementById('last_update').innerText = new Date().toLocaleTimeString();
+            document.getElementById('connection_status').innerText = 'Conectado';
+            document.getElementById('connection_status').style.color = '#4CAF50';
 
-        perfChart.data.labels.push(timeStr); 
-        perfChart.data.datasets[0].data.push(speedVal); 
-        perfChart.data.datasets[1].data.push(rpmVal);
-        
-        tempChart.data.labels.push(timeStr); 
-        tempChart.data.datasets[0].data.push(tempVal); 
-        tempChart.data.datasets[1].data.push(oilVal);
-        
-        if (perfChart.data.labels.length > 60) { perfChart.data.labels.shift(); perfChart.data.datasets[0].data.shift(); perfChart.data.datasets[1].data.shift(); tempChart.data.labels.shift(); tempChart.data.datasets[0].data.shift(); tempChart.data.datasets[1].data.shift(); }
-        perfChart.update(); tempChart.update();
-    }
+            // 1. Actualización de Valores
+            document.getElementById('temp_agua_value').innerText = data.temp_agua.toFixed(1);
+            document.getElementById('temp_aceite_value').innerText = data.temp_aceite.toFixed(1);
+            document.getElementById('combustible_value').innerText = data.combustible.toFixed(0);
+            document.getElementById('bateria_value').innerText = data.bateria.toFixed(2);
+            document.getElementById('velocidad_value').innerText = data.velocidad.toFixed(0);
+            document.getElementById('rpm_value').innerText = data.rpm.toFixed(0);
+            
+            // 2. Aplicación de Colores y Notificación de Reserva
+            updateColor(document.getElementById('temp_agua_value'), data.temp_agua, 'temp_agua');
+            updateColor(document.getElementById('temp_aceite_value'), data.temp_aceite, 'temp_aceite');
+            updateColor(document.getElementById('combustible_value'), data.combustible, 'combustible');
+            updateColor(document.getElementById('bateria_value'), data.bateria, 'bateria');
+            
+            // 3. Coordenadas (No se actualizan, la pestaña está oculta)
+        }
 
-    // --- GESTIÓN DE PESTAÑAS ---
-    function filterCategory(cat) {
-      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); event.target.classList.add('active');
+        // --- SIMULACIÓN DE DATOS (Para ver los colores y la reserva) ---
+        let simulationValue = 90;
+        let fuelValue = 50;
+        let batteryValue = 13.5;
 
-      const views = { cards: document.getElementById('cards-view'), graph: document.getElementById('graph-view'), location: document.getElementById('location-view') };
+        setInterval(() => {
+            // Simula cambio de temperatura y nivel de combustible
+            simulationValue += (Math.random() - 0.5) * 5; 
+            if (simulationValue > 110) simulationValue = 110;
+            if (simulationValue < 80) simulationValue = 80;
 
-      for (let key in views) views[key].classList.add('hidden');
+            fuelValue -= 1; // El combustible baja lentamente
+            if (fuelValue < 0) fuelValue = 50;
 
-      if (cat === 'graph') {
-        views.graph.classList.remove('hidden');
-        perfChart.resize(); tempChart.resize();
-      } else if (cat === 'location') { // LÓGICA DE LOCALIZACIÓN
-        views.location.classList.remove('hidden');
-        // No se necesita initMap ni invalidateSize
-        
-      } else { 
-        views.cards.classList.remove('hidden');
-        document.querySelectorAll('.card').forEach(card => { 
-          card.classList.add('hidden'); 
-          if (cat === 'all') { if(card.classList.contains('cat-all')) card.classList.remove('hidden'); } 
-          else if (cat === 'user') { if(card.classList.contains('cat-user')) card.classList.remove('hidden'); }
-          else if (cat === 'motor') { if(card.classList.contains('cat-motor')) card.classList.remove('hidden'); }
-          else if (cat === 'elec') { if(card.classList.contains('cat-elec')) card.classList.remove('hidden'); }
-        });
-      }
-    }
+            batteryValue += (Math.random() - 0.5) * 0.1;
+            if (batteryValue > 15.8) batteryValue = 15.8;
+            if (batteryValue < 11.0) batteryValue = 11.0;
 
-    window.onload = function() { filterCategory('user', document.querySelector('.nav-btn.active')); };
 
-    // --- RECEPCIÓN MQTT ---
-    client.onMessageArrived = (msg) => { 
-      try { 
-        const data = JSON.parse(msg.payloadString);
-        updateDataAndState(data); // Llamada a la funcion de persistencia
-      } catch (e) { console.error(e); } 
-    };
+            const simulatedData = {
+                temp_agua: simulationValue,      // Cambiará de color
+                temp_aceite: simulationValue - 5, // Similar a la del agua
+                combustible: fuelValue,          // Para probar la reserva (< 10)
+                bateria: batteryValue,           // Para probar el rango de voltaje
+                velocidad: Math.random() * 120,
+                rpm: Math.random() * 5000
+            };
 
-    client.connect({ useSSL: true, onSuccess: () => { console.log("Conectado"); client.subscribe(topic); }});
-  </script>
+            updateTelemetry(simulatedData);
+        }, 3000); // Actualiza cada 3 segundos
+
+        // Inicia la simulación inmediatamente
+        updateTelemetry({ temp_agua: 90, temp_aceite: 85, combustible: 50, bateria: 13.5, velocidad: 0, rpm: 0 });
+    </script>
+
 </body>
 </html>
+
+```
+
+###📋 Resumen de Cambios1. **Coordenadas Eliminadas/Ocultas:**
+* La pestaña de ubicación GPS ahora tiene la clase `coord-hidden` en el HTML, ocultándola por defecto (`display: none;` en CSS).
+
+
+2. **Notificación de Reserva:**
+* Se añadió un `div` flotante con `id="reserva-notification"` y estilos CSS que lo centran y le dan un efecto de "pulso" (`animation: pulse 1s infinite alternate;`).
+* El código JavaScript ahora muestra (`display: block`) esta notificación cuando el valor de `combustible` cae por debajo del umbral de peligro (`10%`).
+
+
+3. **Contenedores de Colores (Temperatura, Combustible, Batería):**
+* Se definieron umbrales en el objeto `UMBRALES` dentro de JavaScript.
+* Se creó la función `updateColor()` que lee estos umbrales y aplica las clases CSS (`.color-green`, `.color-orange`, `.color-red`) a los contenedores de valor (`<div id="..._value" class="value">`).
+* La lógica de la **Batería** usa un rango (rojo si es muy bajo o muy alto).
+* La lógica del **Combustible** usa el rojo para los valores más bajos (Reserva).
+* La lógica de las **Temperaturas** usa el rojo para los valores más altos (Sobrecalentamiento).
