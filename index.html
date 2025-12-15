@@ -1,267 +1,412 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Monitor Vehículo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <title>Monitor de Vehiculo GPS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a; --card-bg: #1e293b; --text-main: #f8fafc;
+            --accent: #10b981; --danger: #ef4444; --warning: #f59e0b; --info: #3b82f6;
+        }
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  <style>
-    body {
-      margin: 0;
-      padding: 15px;
-      font-family: Roboto, sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
+        body {
+            background-color: var(--bg-color); color: var(--text-main); font-family: 'Roboto', sans-serif;
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 15px;
+        }
 
-    .hidden { display: none !important; }
+        /* ESTILOS DE ESTADO (Colores Dinámicos) */
+        .state-success .value { color: var(--accent); } /* VERDE */
+        .state-success::before { background: var(--accent); opacity: 1; }
 
-    .nav-tabs {
-      display: flex;
-      gap: 6px;
-      background: #1e293b;
-      padding: 6px;
-      border-radius: 10px;
-      max-width: 600px;
-      width: 100%;
-      margin-bottom: 20px;
-    }
+        .state-warning .value { color: var(--warning); } /* NARANJA */
+        .state-warning::before { background: var(--warning); opacity: 1; }
 
-    .nav-btn {
-      flex: 1;
-      border: none;
-      background: none;
-      color: #94a3b8;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      padding: 8px;
-      border-radius: 6px;
-    }
+        .state-danger .value { color: var(--danger); } /* ROJO */
+        .state-danger::before { background: var(--danger); opacity: 1; }
+        
+        /* ALERTA COMBUSTIBLE */
+        #fuel-alert {
+            position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%);
+            background-color: rgba(220, 38, 38, 0.95); color: white; padding: 25px 50px;
+            border-radius: 12px; border: 2px solid #fca5a5; text-align: center;
+            z-index: 9999; box-shadow: 0 0 60px rgba(0,0,0,0.8); display: none;
+            animation: alert-blink 0.8s infinite alternate;
+        }
+        .alert-icon { font-size: 3rem; display: block; margin-bottom: 10px; }
+        .alert-title { font-size: 1.5rem; font-weight: 700; text-transform: uppercase; display: block; }
+        .alert-desc { font-size: 1.1rem; }
+        @keyframes alert-blink { 0% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.02); } }
 
-    .nav-btn.active {
-      background: #3b82f6;
-      color: white;
-    }
+        /* NAVEGACIÓN */
+        .nav-tabs {
+            display: flex; gap: 8px; margin-bottom: 20px; background: #1e293b; padding: 6px;
+            border-radius: 12px; width: 100%; max-width: 600px; overflow-x: auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .nav-btn {
+            flex: 1; padding: 10px 15px; background: transparent; border: none; color: #94a3b8;
+            font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s; white-space: nowrap;
+        }
+        .nav-btn.active { background: var(--info); color: white; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); }
 
-    .dashboard {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 15px;
-      max-width: 600px;
-      width: 100%;
-    }
+        /* CONTENEDORES PRINCIPALES */
+        .dashboard-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 600px; margin-bottom: 20px;
+        }
+        #graph-view, #location-view {
+            width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 15px;
+        }
+        .hidden { display: none !important; }
 
-    .card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 10px;
-      padding: 14px;
-      text-align: center;
-    }
+        /* TARJETAS */
+        .card {
+            background: var(--card-bg); border-radius: 12px; padding: 15px; text-align: center;
+            border: 1px solid #334155; position: relative; overflow: hidden; display: flex;
+            flex-direction: column; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: #64748b; opacity: 0.5; }
+        .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 8px; font-weight: 500; }
+        .value { font-size: 2.2rem; font-weight: 700; color: var(--text-main); }
+        .unit { font-size: 0.9rem; color: #64748b; margin-left: 2px; }
+        .card.highlight { grid-column: span 2; background: linear-gradient(145deg, #1e293b, #0f172a); border-color: var(--info); }
+        .highlight .value { font-size: 3.5rem; color: var(--info); } .highlight::before { background: var(--info); opacity: 1; }
+        
+        /* GPS CARDS Y LOCATION VIEW STYLES */
+        .gps-coords { font-size: 1.1rem; font-family: monospace; color: var(--text-main); display: flex; flex-direction: column; gap: 5px; }
+        .gps-sats { font-size: 0.8rem; color: #94a3b8; margin-top: 8px; }
+        
+        /* ESTILO ESPECIFICO DE MAPA */
+        #map-iframe { border: none; height: 350px; width: 100%; border-radius: 8px; border: 1px solid #334155; background-color: #334155; }
+        .location-info { 
+            background: var(--card-bg); border-radius: 12px; padding: 15px; margin-bottom: 15px; text-align: center; border: 1px solid #334155; box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
+        }
+        .location-info .gps-coords { font-size: 1.5rem; }
 
-    .card.big { grid-column: span 2; }
 
-    .label {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      color: #94a3b8;
-      margin-bottom: 6px;
-    }
-
-    .value {
-      font-size: 2rem;
-      font-weight: 700;
-    }
-
-    .unit {
-      font-size: 0.9rem;
-      color: #94a3b8;
-    }
-
-    .state-ok { color: #10b981; }
-    .state-warn { color: #f59e0b; }
-    .state-bad { color: #ef4444; }
-
-    #alert {
-      position: fixed;
-      top: 30%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #dc2626;
-      color: white;
-      padding: 20px 40px;
-      border-radius: 10px;
-      display: none;
-      z-index: 9999;
-    }
-
-    .chart-box {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 10px;
-      padding: 12px;
-      height: 260px;
-    }
-
-    iframe {
-      width: 100%;
-      height: 350px;
-      border: 1px solid #334155;
-      border-radius: 8px;
-    }
-  </style>
+        /* GRÁFICOS */
+        .chart-container {
+            width: 100%; background: var(--card-bg); padding: 15px; border-radius: 12px;
+            border: 1px solid #334155; height: 260px; position: relative;
+        }
+        .chart-header {
+            font-size: 0.8rem; color: #94a3b8; text-transform: uppercase;
+            font-weight: 700; margin-bottom: 10px; text-align: left;
+        }
+    </style>
 </head>
 <body>
 
-<div id="alert">⚠️ Combustible en reserva</div>
+    <div id="fuel-alert">
+        <span class="alert-icon">⛽</span>
+        <span class="alert-title">¡RESERVA ACTIVA!</span>
+        <span class="alert-desc">Nivel de combustible bajo</span>
+    </div>
 
-<div class="nav-tabs">
-  <button class="nav-btn active" data-view="main">Principal</button>
-  <button class="nav-btn" data-view="charts">Histórico</button>
-  <button class="nav-btn" data-view="map">Mapa</button>
-</div>
+    <div class="nav-tabs">
+        <button class="nav-btn active" onclick="filterCategory('user')">PRINCIPAL</button>
+        <button class="nav-btn" onclick="filterCategory('graph')">HISTÓRICO</button>
+        <button class="nav-btn" onclick="filterCategory('location')">LOCALIZACIÓN</button> 
+        <button class="nav-btn" onclick="filterCategory('all')">TÉCNICO (TODO)</button>
+        <button class="nav-btn" onclick="filterCategory('motor')">MOTOR</button>
+        <button class="nav-btn" onclick="filterCategory('elec')">SISTEMAS</button>
+    </div>
 
-<div id="view-main" class="dashboard">
-  <div class="card big"><div class="label">Velocidad</div><div><span id="speed" class="value">--</span> <span class="unit">km/h</span></div></div>
-  <div class="card"><div class="label">RPM</div><div id="rpm" class="value">--</div></div>
-  <div class="card"><div class="label">Temp. Agua</div><div id="temp" class="value">--</div></div>
-  <div class="card"><div class="label">Temp. Aceite</div><div id="oil" class="value">--</div></div>
-  <div class="card"><div class="label">Combustible</div><div><span id="fuel" class="value">--</span><span class="unit">%</span></div></div>
-  <div class="card"><div class="label">Batería</div><div><span id="voltage" class="value">--</span><span class="unit">V</span></div></div>
-</div>
+    <div id="cards-view" class="dashboard-grid">
+        
+        <div class="card highlight cat-all cat-motor cat-elec cat-user" id="card-speed"><div class="label">Velocidad</div><div><span class="value" id="speed">--</span> <span class="unit">km/h</span></div></div>
+        
+        <div class="card cat-all cat-motor cat-user" id="card-temp"><div class="label">Temp. Agua</div><div><span class="value" id="temp">--</span> <span class="unit">°C</span></div></div>
+        <div class="card cat-all cat-motor cat-user" id="card-oil"><div class="label">Temp. Aceite</div><div><span class="value" id="oil">--</span> <span class="unit">°C</span></div></div>
+        <div class="card cat-all cat-elec cat-user" id="card-fuel"><div class="label">Combustible</div><div><span class="value" id="fuel">--</span> <span class="unit">%</span></div></div>
+        <div class="card cat-all cat-elec cat-user" id="card-voltage"><div class="label">Bateria</div><div><span class="value" id="voltage">--</span> <span class="unit">V</span></div></div>
 
-<div id="view-charts" class="hidden" style="max-width:600px;width:100%">
-  <div class="chart-box"><canvas id="chartPerf"></canvas></div>
-  <div class="chart-box" style="margin-top:15px"><canvas id="chartTemp"></canvas></div>
-</div>
+        <div class="card cat-all cat-elec" style="border-color: var(--info);">
+            <div class="label">Posicion GPS</div>
+            <div class="gps-coords">
+                <div>Lat: <span id="lat">--.----</span></div>
+                <div>Lon: <span id="lon">--.----</span></div>
+            </div>
+            <div class="gps-sats">Satélites: <span id="sats">0</span></div>
+        </div>
 
-<div id="view-map" class="hidden" style="max-width:600px;width:100%">
-  <div class="card"><div id="coords">Lat -- / Lon --</div><div id="sats">Sats: 0</div></div>
-  <iframe id="map"></iframe>
-</div>
+        <div class="card cat-all cat-motor" id="card-rpm"><div class="label">RPM</div><div><span class="value" id="rpm">--</span></div></div>
+        <div class="card cat-all cat-motor" id="card-map"><div class="label">Presion MAP</div><div><span class="value" id="map">--</span> <span class="unit">kPa</span></div></div>
+        <div class="card cat-all cat-motor" id="card-load"><div class="label">Carga Motor</div><div><span class="value" id="load">--</span> <span class="unit">%</span></div></div>
+        <div class="card cat-all cat-motor" id="card-throttle"><div class="label">Acelerador</div><div><span class="value" id="throttle">--</span> <span class="unit">%</span></div></div>
+        <div class="card cat-all cat-motor" id="card-iat"><div class="label">Temp. Admision</div><div><span class="value" id="iat">--</span> <span class="unit">°C</span></div></div>
+        <div class="card cat-all cat-motor" id="card-lambda"><div class="label">Mezcla (lambda)</div><div><span class="value" id="lambda">--</span> <span class="unit"></span></div></div>
+        <div class="card cat-all cat-motor" id="card-timing"><div class="label">Avance</div><div><span class="value" id="timing">--</span> <span class="unit">°</span></div></div>
+    </div>
 
-<script>
-  const client = new Paho.MQTT.Client(
-    "broker.emqx.io",
-    8084,
-    "/mqtt",
-    "veh_" + Math.random().toString(16).slice(2)
-  );
+    <div id="graph-view" class="hidden">
+        <div class="chart-container"><div class="chart-header">Velocidad / RPM (Ultimo minuto)</div><canvas id="perfChart"></canvas></div>
+        <div class="chart-container"><div class="chart-header">Temperatura Motor (Agua / Aceite)</div><canvas id="tempChart"></canvas></div>
+    </div>
 
-  const el = id => document.getElementById(id);
+    <div id="location-view" class="hidden">
+        <div class="location-info">
+            <div class="label">UBICACIÓN ACTUAL Y ESTADO GPS</div>
+            <div class="gps-coords">
+                <div>Lat: <span id="map-lat">--.----</span></div>
+                <div>Lon: <span id="map-lon">--.----</span></div>
+            </div>
+            <div class="gps-sats">Satélites: <span id="map-sats">0</span></div>
+        </div>
+        <iframe id="map-iframe" src="about:blank" title="Mapa de Ubicación GPS"></iframe>
+    </div>
+    <script>
+        // --- CONFIGURACIÓN MQTT Y ELEMENTOS  ---
+        const broker = "broker.emqx.io"; const port = 8084; const topic = "coches/raspi1/telemetria";
+        const clientID = "fleet_gps_final_" + Math.random().toString(16).substr(2, 8);
+        const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
 
-  const last = {};
+        const cards = { 
+            speed: document.getElementById("speed"), rpm: document.getElementById("rpm"), temp: document.getElementById("temp"), oil: document.getElementById("oil"), 
+            map: document.getElementById("map"), load: document.getElementById("load"), fuel: document.getElementById("fuel"), voltage: document.getElementById("voltage"), 
+            throttle: document.getElementById("throttle"), iat: document.getElementById("iat"), lambda: document.getElementById("lambda"), timing: document.getElementById("timing"),
+            // GPS Cards PRINCIPAL
+            lat: document.getElementById("lat"), lon: document.getElementById("lon"), sats: document.getElementById("sats")
+        };
+        // Elementos de la pestaña LOCALIZACIÓN
+        const mapCoords = { lat: document.getElementById("map-lat"), lon: document.getElementById("map-lon"), sats: document.getElementById("map-sats") }
+        const mapFrame = document.getElementById("map-iframe");
+        
+        // Almacena el ultimo valor para persistencia en tarjetas
+        const lastDisplayedValues = { 
+            speed: 0, rpm: 0, temp: 0, oil: 0, map: 0, load: 0, fuel: 0, voltage: 0, 
+            throttle: 0, iat: 0, lambda: 0, timing: 0,
+            lat: 0.0, lon: 0.0, sats: 0 
+        };
 
-  const limits = {
-    temp: [75, 95],
-    fuel: [10, 20],
-    volt: [12, 15]
-  };
+        // --- UMBRALES DE ESTADO PARA COLORES  ---
+        const UMBRALES = {
+            // Valores de temperatura (Agua y Aceite)
+            TEMP: { WARNING_MIN: 40, OK_MIN: 75, OK_MAX: 95, DANGER: 105, WARNING_MAX: 100 }, // °C
+            
+            // Combustible
+            FUEL: { DANGER: 10, WARNING: 20 }, // % (Reserva < 10)
+            
+            // Batería
+            VOLTAGE: { DANGER_LOW: 11.5, WARNING_LOW: 12.0, OK_MAX: 14.8, WARNING_HIGH: 15.2, DANGER_HIGH: 15.5 } // V
+        };
 
-  const perfChart = new Chart(el("chartPerf"), {
-    type: "line",
-    data: { labels: [], datasets: [{ label: "Velocidad", data: [] }, { label: "RPM", data: [] }] },
-    options: { responsive: true, animation: false }
-  });
 
-  const tempChart = new Chart(el("chartTemp"), {
-    type: "line",
-    data: { labels: [], datasets: [{ label: "Agua", data: [] }, { label: "Aceite", data: [] }] },
-    options: { responsive: true, animation: false }
-  });
+        // --- VARIABLES DE CONTROL DE FRECUENCIA DEL MAPA ---
+        let mapUpdateCounter = 0;
+        const MAP_UPDATE_RATE = 3; // Actualizar el mapa solo cada 3 segundos
 
-  function applyState(id, val, type) {
-    const node = el(id);
-    node.classList.remove("state-ok", "state-warn", "state-bad");
+        // --- GRÁFICOS (Mantenidos) ---
+        const ctx1 = document.getElementById('perfChart').getContext('2d');
+        const perfChart = new Chart(ctx1, { type: 'line', data: { labels: [], datasets: [ { label: 'Velocidad', data: [], borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y', pointRadius: 0, tension: 0.3 }, { label: 'RPM', data: [], borderColor: '#f59e0b', borderWidth: 2, yAxisID: 'y1', pointRadius: 0, tension: 0.3 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { type: 'linear', position: 'left', ticks: { color: '#3b82f6' }, grid: { color: '#334155' } }, y1: { type: 'linear', display: true, position: 'right', ticks: { color: '#f59e0b', callback: v => v/1000 + 'k' }, grid: { drawOnChartArea: false } } } } });
+        const ctx2 = document.getElementById('tempChart').getContext('2d');
+        const tempChart = new Chart(ctx2, { type: 'line', data: { labels: [], datasets: [ { label: 'Agua', data: [], borderColor: '#22d3ee', borderWidth: 2, pointRadius: 0, tension: 0.4 }, { label: 'Aceite', data: [], borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, tension: 0.4 } ] }, options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { display: false }, grid: { color: '#334155' } }, y: { ticks: { color: '#cbd5e1' }, grid: { color: '#334155' }, suggestedMin: 50, suggestedMax: 110 } } } });
 
-    if (type === "temp") {
-      if (val > 105) node.classList.add("state-bad");
-      else if (val < limits.temp[0] || val > limits.temp[1]) node.classList.add("state-warn");
-      else node.classList.add("state-ok");
-    }
+        // --- MAPA ESTATICO (Mantenido) ---
 
-    if (type === "fuel") {
-      if (val <= limits.fuel[0]) node.classList.add("state-bad");
-      else if (val <= limits.fuel[1]) node.classList.add("state-warn");
-      else node.classList.add("state-ok");
-    }
+        function updateMap(lat, lon, sats) {
+            // 1. Actualizar coordenadas en la PESTAÑA LOCALIZACIÓN (SIEMPRE)
+            mapCoords.lat.innerText = lat ? lat.toFixed(6) : "--.----";
+            mapCoords.lon.innerText = lon ? lon.toFixed(6) : "--.----";
+            mapCoords.sats.innerText = sats;
 
-    if (type === "volt") {
-      if (val < limits.volt[0] || val > limits.volt[1]) node.classList.add("state-warn");
-      else node.classList.add("state-ok");
-    }
-  }
+            // Solo actualizamos el IFRAME si estamos en la pestaña y si el contador lo permite
+            if (document.getElementById('location-view').classList.contains('hidden') || mapUpdateCounter % MAP_UPDATE_RATE !== 0) {
+                mapUpdateCounter++;
+                return;
+            }
+            
+            if (lat === 0 || lon === 0 || sats === 0) {
+                // Mostrar mapa predeterminado (Madrid) si no hay señal
+                mapFrame.src = `https://maps.google.com/maps?q=40.4168,-3.7038&z=13&output=embed`;
+                mapUpdateCounter++;
+                return;
+            }
+            
+            // 2. Generar URL de incrustación del mapa con marcador
+            const mapUrl = `https://maps.google.com/maps?q=$${lat},${lon}&z=16&output=embed&marker=${lat},${lon}`;
+            
+            // 3. Actualizar la fuente del iframe
+            mapFrame.src = mapUrl;
+            mapUpdateCounter++;
+        }
 
-  function update(data) {
-    Object.keys(data).forEach(k => {
-      if (el(k)) {
-        el(k).innerText = data[k];
-        last[k] = data[k];
-      }
-    });
 
-    applyState("temp", data.temp, "temp");
-    applyState("oil", data.oil, "temp");
-    applyState("fuel", data.fuel, "fuel");
-    applyState("voltage", data.voltage, "volt");
+        // --- LÓGICA DE PERSISTENCIA Y ACTUALIZACIÓN ---
 
-    el("alert").style.display = data.fuel <= limits.fuel[0] ? "block" : "none";
+        function updateDataAndState(data) {
+            let currentValues = {};
+            // lat, lon, sats se actualizan siempre, incluso si no tienen tarjeta visible en PRINCIPAL
+            const updateAlwaysMetrics = ['speed', 'rpm', 'voltage', 'fuel', 'lat', 'lon', 'sats']; 
 
-    perfChart.data.labels.push(".");
-    perfChart.data.datasets[0].data.push(data.speed);
-    perfChart.data.datasets[1].data.push(data.rpm);
+            for (const [key, el] of Object.entries(cards)) { 
+                const value = data[key];
 
-    tempChart.data.labels.push(".");
-    tempChart.data.datasets[0].data.push(data.temp);
-    tempChart.data.datasets[1].data.push(data.oil);
+                if (value !== undefined) {
+                    
+                    if (updateAlwaysMetrics.includes(key) || key === 'lat' || key === 'lon' || key === 'sats') { // Incluye GPS
+                        // Actualizar siempre. Aceptar 0 para Speed/RPM/Voltaje/Fuel/GPS
+                        el.innerText = value;
+                        lastDisplayedValues[key] = value;
+                        currentValues[key] = value;
+                    } else if (value > 0) {
+                        // Temp/Oil/MAP/etc.: Solo si es POSITIVO (> 0), lo actualizamos.
+                        el.innerText = value;
+                        lastDisplayedValues[key] = value;
+                        currentValues[key] = value;
+                    } else {
+                        // Si el valor es 0 o indefinido, usar el valor persistente
+                        el.innerText = lastDisplayedValues[key] > 0 ? lastDisplayedValues[key] : "--";
+                        currentValues[key] = lastDisplayedValues[key]; 
+                    }
+                } else {
+                    // Si el dato no viene, usar el valor persistente
+                    currentValues[key] = lastDisplayedValues[key];
+                }
+            }
+            
+            // Ejecutar lógicas de color y gráfica con los valores persistentes.
+            updateStatus(currentValues);
+            updateCharts(currentValues); 
+            
+            // Llamada al mapa (utiliza los valores persistentes de currentValues)
+            updateMap(currentValues.lat, currentValues.lon, currentValues.sats);
+        }
+        
+        // --- LÓGICA DE COLORES Y ALERTA (MODIFICADA) ---
 
-    if (perfChart.data.labels.length > 60) {
-      perfChart.data.labels.shift();
-      perfChart.data.datasets.forEach(d => d.data.shift());
-      tempChart.data.labels.shift();
-      tempChart.data.datasets.forEach(d => d.data.shift());
-    }
+        function updateStatus(data) {
+            // Aplicar colores dinámicos
+            setColor("card-temp", data.temp, 'TEMP');
+            setColor("card-oil", data.oil, 'TEMP'); // Usa la misma lógica de umbrales para el aceite
+            setColor("card-voltage", data.voltage, 'VOLTAGE');
+            setColor("card-fuel", data.fuel, 'FUEL');
+            
+            // Lógica de Notificación de Reserva
+            const alertBox = document.getElementById("fuel-alert");
+            if (data.fuel > 0 && data.fuel <= UMBRALES.FUEL.DANGER) {
+                alertBox.style.display = "block"; 
+            } else {
+                alertBox.style.display = "none";
+            }
+        }
 
-    perfChart.update();
-    tempChart.update();
+      
+        function setColor(cardId, val, metricKey) {
+            const el = document.getElementById(cardId); 
+            el.classList.remove('state-warning', 'state-success', 'state-danger'); 
+            
+            if(val === 0 || val === undefined) return;
 
-    if (data.lat && data.lon) {
-      el("coords").innerText = `Lat ${data.lat} / Lon ${data.lon}`;
-      el("sats").innerText = `Sats: ${data.sats}`;
-      el("map").src = `https://maps.google.com/maps?q=${data.lat},${data.lon}&z=15&output=embed`;
-    }
-  }
+            const umbral = UMBRALES[metricKey];
+            let stateClass = '';
 
-  client.onMessageArrived = msg => {
-    try { update(JSON.parse(msg.payloadString)); } catch (e) {}
-  };
+            switch (metricKey) {
+                case 'TEMP':
+                    if (val >= umbral.DANGER) {
+                        stateClass = 'state-danger'; // ROJO: Sobrecalentamiento
+                    } else if (val >= umbral.WARNING_MAX || val < umbral.WARNING_MIN) {
+                        stateClass = 'state-warning'; // NARANJA: Advertencia (Caliente o Muy Frío)
+                    } else if (val >= umbral.OK_MIN && val <= umbral.OK_MAX) {
+                        stateClass = 'state-success'; // VERDE: Rango óptimo de trabajo
+                    } else {
+                        stateClass = 'state-warning'; // Por defecto, es advertencia si está fuera del rango OK pero no es peligro
+                    }
+                    break;
 
-  client.connect({
-    useSSL: true,
-    onSuccess: () => client.subscribe("coches/raspi1/telemetria")
-  });
+                case 'FUEL':
+                    // Combustible (Reserva es peligro)
+                    if (val <= umbral.DANGER) {
+                        stateClass = 'state-danger'; // ROJO: Reserva
+                    } else if (val <= umbral.WARNING) {
+                        stateClass = 'state-warning'; // NARANJA: Nivel bajo
+                    } else {
+                        stateClass = 'state-success'; // VERDE: Nivel normal
+                    }
+                    break;
+                
+                case 'VOLTAGE':
+                    // Batería (Rango de voltaje)
+                    if (val < umbral.DANGER_LOW || val > umbral.DANGER_HIGH) {
+                        stateClass = 'state-danger'; // ROJO: Bajo carga o Sobrecarga
+                    } else if (val < umbral.WARNING_LOW || val > umbral.WARNING_HIGH) {
+                        stateClass = 'state-warning'; // NARANJA: Advertencia 
+                    } else {
+                        stateClass = 'state-success'; // VERDE: Rango normal de carga
+                    }
+                    break;
+            }
 
-  document.querySelectorAll(".nav-btn").forEach(btn => {
-    btn.onclick = () => {
-      document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
+            if (stateClass) {
+                el.classList.add(stateClass);
+            }
+        }
+        
+       
+        function updateCharts(data) {
+            const timeStr = new Date().getSeconds();
+            
+            const speedVal = data.speed;
+            const rpmVal = data.rpm;
+            
+            
+            const tempVal = data.temp > 0 ? data.temp : NaN; 
+            const oilVal = data.oil > 0 ? data.oil : NaN;
 
-      ["main", "charts", "map"].forEach(v => el(`view-${v}`).classList.add("hidden"));
-      el(`view-${btn.dataset.view}`).classList.remove("hidden");
-    };
-  });
-</script>
+            perfChart.data.labels.push(timeStr); 
+            perfChart.data.datasets[0].data.push(speedVal); 
+            perfChart.data.datasets[1].data.push(rpmVal);
+            
+            tempChart.data.labels.push(timeStr); 
+            tempChart.data.datasets[0].data.push(tempVal); 
+            tempChart.data.datasets[1].data.push(oilVal);
+            
+            if (perfChart.data.labels.length > 60) { perfChart.data.labels.shift(); perfChart.data.datasets[0].data.shift(); perfChart.data.datasets[1].data.shift(); tempChart.data.labels.shift(); tempChart.data.datasets[0].data.shift(); tempChart.data.datasets[1].data.shift(); }
+            perfChart.update(); tempChart.update();
+        }
 
+        // --- GESTIÓN DE PESTAÑAS  ---
+        function filterCategory(cat) {
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active')); event.target.classList.add('active');
+
+            const views = { cards: document.getElementById('cards-view'), graph: document.getElementById('graph-view'), location: document.getElementById('location-view') };
+
+            for (let key in views) views[key].classList.add('hidden');
+
+            if (cat === 'graph') {
+                views.graph.classList.remove('hidden');
+                perfChart.resize(); tempChart.resize();
+            } else if (cat === 'location') { 
+                views.location.classList.remove('hidden');
+            } else { 
+                views.cards.classList.remove('hidden');
+                document.querySelectorAll('.card').forEach(card => { 
+                    card.classList.add('hidden'); 
+                    if (cat === 'all') { if(card.classList.contains('cat-all')) card.classList.remove('hidden'); } 
+                    else if (cat === 'user') { if(card.classList.contains('cat-user')) card.classList.remove('hidden'); }
+                    else if (cat === 'motor') { if(card.classList.contains('cat-motor')) card.classList.remove('hidden'); }
+                    else if (cat === 'elec') { if(card.classList.contains('cat-elec')) card.classList.remove('hidden'); }
+                });
+            }
+        }
+
+        window.onload = function() { filterCategory('user', document.querySelector('.nav-btn.active')); };
+
+        // --- RECEPCIÓN MQTT ---
+        client.onMessageArrived = (msg) => { 
+            try { 
+                const data = JSON.parse(msg.payloadString);
+                updateDataAndState(data); // Llamada a la funcion de persistencia
+            } catch (e) { console.error(e); } 
+        };
+
+        client.connect({ useSSL: true, onSuccess: () => { console.log("Conectado"); client.subscribe(topic); }});
+    </script>
 </body>
 </html>
