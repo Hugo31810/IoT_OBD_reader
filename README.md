@@ -221,7 +221,7 @@ A continuación, se muestran capturas de la interfaz de usuario:
 
 **Figura 4: Vistas con parámetros extra y gráficos** : Decidimos incluir la visualización de más parámetros en otras pestañas de "usuario avanzado".  También incluimos una pestaña para ver los datos históricos (últimos 60 segundos) representados en un gráfico que se actualiza automáticamente.
 
-| ![[Pasted image 20251215211154.png\|255]] | ![[Pasted image 20251215211220.png\|255]] |
+| ![4](imagenes/4.jpeg) | ![grafico](imagenes/grafico.jpeg) |
 | ----------------------------------------- | ----------------------------------------- |
 
 ## 7. Costes y Escalabilidad
