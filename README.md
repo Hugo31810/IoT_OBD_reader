@@ -23,7 +23,7 @@ Este módulo único combina dos elementos críticos en una sola PCB:
 ![[Pasted image 20251215194524.png]]
 
 A este módulo conectaremos los cables que salen de puerto OBD-II que corresponden al bus CAN (pin 6 y 14):
-![[imagenes/puerto_obd.png]]
+![puerto_obd](imagenes/puerto_obd.png)
 
 ### 2.2. Conectividad y energía
 * **Módulo 4G (Air780EU 4G):** Se ha conectado a través de la interfaz **USB** (y no GPIO).
