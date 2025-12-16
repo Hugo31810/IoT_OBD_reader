@@ -20,7 +20,7 @@ A diferencia de los adaptadores OBD-II comerciales USB (basados en ELM327), que 
 Este módulo único combina dos elementos críticos en una sola PCB:
 * **Transceptor TJA1050:** Realiza la adaptación física de niveles de tensión entre la lógica de 3.3V/5V y el par diferencial del bus CAN (`CAN_H`, `CAN_L`).
 * **Controlador MCP2515:** Gestiona el protocolo CAN 2.0B, el filtrado de tramas y los buffers. Se comunica con la Raspberry Pi mediante el bus **SPI (Serial Peripheral Interface)**.
-![[Pasted image 20251215194524.png]]
+![mcp](imagenes/modulo-can-bus-spi-mcp2515-hw-184.jpg)
 
 A este módulo conectaremos los cables que salen de puerto OBD-II que corresponden al bus CAN (pin 6 y 14):
 ![puerto_obd](imagenes/puerto_obd.png)
@@ -28,9 +28,9 @@ A este módulo conectaremos los cables que salen de puerto OBD-II que correspond
 ### 2.2. Conectividad y energía
 * **Módulo 4G (Air780EU 4G):** Se ha conectado a través de la interfaz **USB** (y no GPIO).
     * La transmisión de datos WAN requiere un ancho de banda y una gestión de energía superiores a los que ofrece el bus UART de la Raspberry Pi. Además, la conexión USB permite utilizar los drivers nativos  para una gestión eficiente con `ModemManager`.
-![[Pasted image 20251215212510.png|375]]
+![4g](imagenes/modem-4g-lte-para-iot-air780eu.jpg)
 * **Convertidor DC-DC:** Se emplea un convertidor  de 12V a 5V (3A) con **protección contra inversión de polaridad**, aislando la Raspberry Pi de los picos de tensión del alternador y la batería del coche.
-![[Pasted image 20251215212520.png|340]]
+![conversor](imagenes/conversor_dc.png)
 
 ## 3. Arquitectura de software y protocolos
 
@@ -209,14 +209,14 @@ La interfaz ha sido desplegada a través de GitHub Pages, que nos da una URL pú
 A continuación, se muestran capturas de la interfaz de usuario:
 
 **Figura 1: Vista principal (dashboard)**: Muestra las tarjetas de telemetría en tiempo real. Se observa la limpieza visual para facilitar la lectura rápida.
-![[Pasted image 20251215210558.png|225]]
+![1](imagenes/1.jpeg)
 
 **Figura 2: Vista de Localización** _Integración del mapa interactivo mostrando la última posición reportada por el módulo GPS vía MQTT._
-![[Pasted image 20251215211629.png|225]]
+![mapa](imagenes/mapa.jpeg)
 
 **Figura 3: Respuesta ante Alertas** : Visualización de la interfaz en un dispositivo móvil cuando se activa una alerta por algún parámetro como por ejemplo la reserva de combustible o temperaturas anómalas.
 
-| ![[Pasted image 20251215210521.png\|200]] | ![[Pasted image 20251215210528.png\|200]] | ![[Pasted image 20251215210715.png\|200]] |
+| ![2](imagenes/2.jpeg) | ![3](imagenes/3.jpeg) | ![reserva](imagenes/reserva.jpeg) |
 | ----------------------------------------- | ----------------------------------------- | ----------------------------------------- |
 
 **Figura 4: Vistas con parámetros extra y gráficos** : Decidimos incluir la visualización de más parámetros en otras pestañas de "usuario avanzado".  También incluimos una pestaña para ver los datos históricos (últimos 60 segundos) representados en un gráfico que se actualiza automáticamente.
