@@ -209,10 +209,10 @@ La interfaz ha sido desplegada a través de GitHub Pages, que nos da una URL pú
 A continuación, se muestran capturas de la interfaz de usuario:
 
 **Figura 1: Vista principal (dashboard)**: Muestra las tarjetas de telemetría en tiempo real. Se observa la limpieza visual para facilitar la lectura rápida.
-![1](imagenes/1.jpeg)
+![1|255](imagenes/1.jpeg)
 
 **Figura 2: Vista de Localización** _Integración del mapa interactivo mostrando la última posición reportada por el módulo GPS vía MQTT._
-![mapa](imagenes/mapa.jpeg)
+![mapa|255](imagenes/mapa.jpeg)
 
 **Figura 3: Respuesta ante Alertas** : Visualización de la interfaz en un dispositivo móvil cuando se activa una alerta por algún parámetro como por ejemplo la reserva de combustible o temperaturas anómalas.
 
