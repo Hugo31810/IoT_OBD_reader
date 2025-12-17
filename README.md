@@ -44,11 +44,15 @@ Este módulo combina en una sola PCB:
 - **Controlador MCP2515:**  
   Gestiona el protocolo CAN 2.0B, el filtrado de tramas y los buffers, comunicándose con la Raspberry Pi mediante **SPI**.
 
-![mcp](imagenes/modulo-can-bus-spi-mcp2515-hw-184.jpg)
+<p align="center">
+  <img src="imagenes/modulo-can-bus-spi-mcp2515-hw-184.jpg" width="380">
+</p>
 
 El módulo se conecta al puerto OBD-II del vehículo a través de los pines correspondientes al bus CAN (pin 6 y 14):
 
-![puerto_obd](imagenes/puerto_obd.png)
+<p align="center">
+  <img src="imagenes/puerto_obd.png" width="300">
+</p>
 
 ---
 
@@ -57,12 +61,16 @@ El módulo se conecta al puerto OBD-II del vehículo a través de los pines corr
 - **Módulo 4G (Air780EU):**  
   Conectado mediante **USB** en lugar de GPIO/UART para garantizar mayor ancho de banda y una gestión eficiente mediante `ModemManager`.
 
-![4g](imagenes/modem-4g-lte-para-iot-air780eu.jpg)
+<p align="center">
+  <img src="imagenes/modem-4g-lte-para-iot-air780eu.jpg" width="350">
+</p>
 
 - **Convertidor DC-DC:**  
   Conversión de 12V a 5V (3A) con **protección contra inversión de polaridad**, aislando la Raspberry Pi de picos de tensión del sistema eléctrico del vehículo.
 
-![conversor](imagenes/conversor_dc.png)
+<p align="center">
+  <img src="imagenes/conversor_dc.png" width="300">
+</p>
 
 ---
 
@@ -199,18 +207,31 @@ El sistema implementa **Inteligencia Ambiental** mediante un sistema de alertas 
 ### Capturas
 
 **Dashboard principal**
-![1](imagenes/1.jpeg)
+
+<p align="center">
+  <img src="imagenes/1.jpeg" width="600">
+</p>
 
 **Vista de localización**
-![mapa](imagenes/mapa.jpeg)
+
+<p align="center">
+  <img src="imagenes/mapa.jpeg" width="550">
+</p>
 
 **Alertas en móvil**
 
-| ![2](imagenes/2.jpeg) | ![3](imagenes/3.jpeg) | ![reserva](imagenes/reserva.jpeg) |
+<p align="center">
+  <img src="imagenes/2.jpeg" width="220">
+  <img src="imagenes/3.jpeg" width="220">
+  <img src="imagenes/reserva.jpeg" width="220">
+</p>
 
 **Parámetros avanzados y gráficos**
 
-| ![4](imagenes/4.jpeg) | ![grafico](imagenes/grafico.jpeg) |
+<p align="center">
+  <img src="imagenes/4.jpeg" width="300">
+  <img src="imagenes/grafico.jpeg" width="300">
+</p>
 
 ---
 
@@ -248,5 +269,5 @@ El proyecto demuestra la integración efectiva de **hardware embebido, redes cel
 ## SAE J1979, MQTT 3.1.1, Eclipse Paho, CSS Electronics, DFRobot, Wikipedia OBD-II PID.
 
 **Autor:** Hugo Salvador Aizpún
-Proyecto desarrollado en el marco de la asignatura **Inteligencia Ambientaal y Computación Ubicua**  
+Proyecto desarrollado en el marco de la asignatura **Inteligencia Ambientaal y Computación Ubicua**
 Universidad Rey Juan Carlos – Curso 2025–2026
